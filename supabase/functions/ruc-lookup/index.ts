@@ -40,17 +40,20 @@ async function lookupRucPeru(ruc: string): Promise<FiscalResult> {
   // Factiliza puede devolver el objeto directamente o dentro de { data: {...} }
   const d = (body.data ?? body) as Record<string, unknown>;
 
-  if (!d.razon_social) throw new Error("RUC_NOT_FOUND");
+  // Factiliza usa "nombre_o_razon_social" como campo principal
+  const legalName = d.nombre_o_razon_social ?? d.razon_social;
+  if (!legalName) throw new Error("RUC_NOT_FOUND");
 
   return {
     fiscal_id:   ruc,
-    legal_name:  String(d.razon_social ?? "").trim(),
+    legal_name:  String(legalName).trim(),
     trade_name:  d.nombre_comercial ? String(d.nombre_comercial).trim() : undefined,
     status:      String(d.estado ?? "DESCONOCIDO").trim(),
-    condition:   d.condicion   ? String(d.condicion).trim()   : undefined,
-    address:     d.direccion   ? String(d.direccion).trim()   : undefined,
-    district:    d.distrito    ? String(d.distrito).trim()    : undefined,
-    province:    d.provincia   ? String(d.provincia).trim()   : undefined,
+    condition:   d.condicion    ? String(d.condicion).trim()    : undefined,
+    address:     d.direccion_completa ?? d.direccion
+                   ? String(d.direccion_completa ?? d.direccion).trim() : undefined,
+    district:    d.distrito     ? String(d.distrito).trim()     : undefined,
+    province:    d.provincia    ? String(d.provincia).trim()    : undefined,
     department:  d.departamento ? String(d.departamento).trim() : undefined,
     country:     "PE",
     raw:         d,
