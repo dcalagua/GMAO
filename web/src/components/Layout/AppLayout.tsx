@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@mui/icons-material";
 import { Divider as MuiDivider } from "@mui/material";
 import { supabase } from "../../supabaseClient";
+import { preloadGmao } from "../../lib/api";
 
 const DRAWER_WIDTH = 240;
 
@@ -35,6 +36,9 @@ export default function AppLayout({ session }: AppLayoutProps) {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
+  // Precarga los 3 endpoints GMAO en background para eliminar cold-starts visibles
+  useEffect(() => { preloadGmao(); }, []);
 
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);

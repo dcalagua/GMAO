@@ -6,7 +6,7 @@ import {
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton,
 } from "@mui/material";
 import { Add, Refresh, PrecisionManufacturing, Edit, Delete } from "@mui/icons-material";
-import { callFn } from "../lib/api";
+import { callFn, callFnCached, invalidateCache } from "../lib/api";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ export default function EquipmentPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await callFn<{ data: Equipment[] }>("tenant-equipment", { action: "list" });
+      const res = await callFnCached<{ data: Equipment[] }>("tenant-equipment", { action: "list" }, "equipment:list");
       setRows(res.data ?? []);
     } catch (e) {
       setError((e as Error).message);
@@ -137,6 +137,7 @@ export default function EquipmentPage() {
       } else {
         await callFn("tenant-equipment", { action: "create", data });
       }
+      invalidateCache("equipment:list");
       await load();
       handleClose();
     } catch (e) {
@@ -153,6 +154,7 @@ export default function EquipmentPage() {
     setDeleting(id);
     try {
       await callFn("tenant-equipment", { action: "delete", id });
+      invalidateCache("equipment:list");
       await load();
     } catch (e) {
       alert((e as Error).message);

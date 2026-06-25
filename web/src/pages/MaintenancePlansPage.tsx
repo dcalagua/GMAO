@@ -6,7 +6,7 @@ import {
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton, Switch, FormControlLabel,
 } from "@mui/material";
 import { Add, Refresh, CalendarMonth, Edit, Delete } from "@mui/icons-material";
-import { callFn } from "../lib/api";
+import { callFn, callFnCached, invalidateCache } from "../lib/api";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -79,8 +79,8 @@ export default function MaintenancePlansPage() {
     setError(null);
     try {
       const [plRes, eqRes] = await Promise.all([
-        callFn<{ data: Plan[] }>("tenant-maintenance-plans", { action: "list" }),
-        callFn<{ data: Equipment[] }>("tenant-equipment", { action: "list" }),
+        callFnCached<{ data: Plan[] }>("tenant-maintenance-plans", { action: "list" }, "plans:list"),
+        callFnCached<{ data: Equipment[] }>("tenant-equipment", { action: "list" }, "equipment:list"),
       ]);
       setRows(plRes.data ?? []);
       setEquipment(eqRes.data ?? []);
@@ -132,6 +132,7 @@ export default function MaintenancePlansPage() {
       };
       if (editId) await callFn("tenant-maintenance-plans", { action: "update", id: editId, data });
       else        await callFn("tenant-maintenance-plans", { action: "create", data });
+      invalidateCache("plans:list");
       await load(); handleClose();
     } catch (e) {
       const msg = (e as Error).message;
@@ -143,7 +144,7 @@ export default function MaintenancePlansPage() {
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este plan de mantenimiento?")) return;
     setDeleting(id);
-    try { await callFn("tenant-maintenance-plans", { action: "delete", id }); await load(); }
+    try { await callFn("tenant-maintenance-plans", { action: "delete", id }); invalidateCache("plans:list"); await load(); }
     catch (e) { alert((e as Error).message); }
     finally { setDeleting(null); }
   }

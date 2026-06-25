@@ -6,7 +6,7 @@ import {
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton,
 } from "@mui/material";
 import { Add, Refresh, Assignment, Edit, Delete } from "@mui/icons-material";
-import { callFn } from "../lib/api";
+import { callFn, callFnCached, invalidateCache } from "../lib/api";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -90,8 +90,8 @@ export default function WorkOrdersPage() {
     setError(null);
     try {
       const [woRes, eqRes] = await Promise.all([
-        callFn<{ data: WorkOrder[] }>("tenant-work-orders", { action: "list" }),
-        callFn<{ data: Equipment[] }>("tenant-equipment", { action: "list" }),
+        callFnCached<{ data: WorkOrder[] }>("tenant-work-orders", { action: "list" }, "work-orders:list"),
+        callFnCached<{ data: Equipment[] }>("tenant-equipment", { action: "list" }, "equipment:list"),
       ]);
       setRows(woRes.data ?? []);
       setEquipment(eqRes.data ?? []);
@@ -156,6 +156,7 @@ export default function WorkOrdersPage() {
       } else {
         await callFn("tenant-work-orders", { action: "create", data });
       }
+      invalidateCache("work-orders:list");
       await load();
       handleClose();
     } catch (e) {
@@ -170,6 +171,7 @@ export default function WorkOrdersPage() {
     setDeleting(id);
     try {
       await callFn("tenant-work-orders", { action: "delete", id });
+      invalidateCache("work-orders:list");
       await load();
     } catch (e) {
       alert((e as Error).message);
