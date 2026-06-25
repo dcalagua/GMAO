@@ -5,7 +5,10 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton, ToggleButtonGroup, ToggleButton,
 } from "@mui/material";
-import { Add, Refresh, Assignment, Edit, Delete, PlayArrow, CheckCircle, Lock, Inventory2 } from "@mui/icons-material";
+import {
+  Add, Refresh, Assignment, Edit, Delete, PlayArrow, CheckCircle, Lock, Inventory2,
+  AttachFile, InsertDriveFile, Image as ImageIcon, Download,
+} from "@mui/icons-material";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
 import { supabase } from "../supabaseClient";
 
@@ -37,6 +40,7 @@ interface Equipment { id: string; code: string; name: string; }
 interface TenantUser { auth_user_id: string; email: string; full_name: string | null; }
 interface MaterialOpt { id: string; code: string; name: string; unit: string; stock_qty: number; unit_cost: number | null; }
 interface WoMaterial { id: string; material_id: string; code: string; name: string; unit: string; qty: number; unit_cost: number; line_cost: number; }
+interface Attachment { id: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string; url: string | null; }
 
 interface WoForm {
   title: string; description: string;
@@ -109,6 +113,12 @@ export default function WorkOrdersPage() {
   const [addMatQty, setAddMatQty] = useState("");
   const [matBusy, setMatBusy] = useState(false);
   const [matError, setMatError] = useState<string | null>(null);
+  // Adjuntos de la OT
+  const [attWo, setAttWo] = useState<WorkOrder | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [attError, setAttError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -301,6 +311,56 @@ export default function WorkOrdersPage() {
     finally { setMatBusy(false); }
   }
 
+  // ── Adjuntos de la OT ──────────────────────────────────────────────────────
+  async function openAttachments(wo: WorkOrder) {
+    setAttWo(wo); setAttError(null); setAttLoading(true);
+    try {
+      const res = await callFn<{ data: Attachment[] }>("tenant-attachments", { action: "list", work_order_id: wo.id });
+      setAttachments(res.data ?? []);
+    } catch (e) { setAttError((e as Error).message); }
+    finally { setAttLoading(false); }
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !attWo) return;
+    if (file.size > 10 * 1024 * 1024) { setAttError("El archivo supera el límite de 10 MB."); return; }
+    setUploading(true); setAttError(null);
+    try {
+      // 1) URL firmada de subida
+      const sign = await callFn<{ path: string; token: string }>(
+        "tenant-attachments", { action: "upload_url", work_order_id: attWo.id, file_name: file.name });
+      // 2) Subida directa a Storage
+      const { error: upErr } = await supabase.storage.from("wo-attachments")
+        .uploadToSignedUrl(sign.path, sign.token, file);
+      if (upErr) throw new Error(upErr.message);
+      // 3) Registrar metadata
+      await callFn("tenant-attachments", {
+        action: "confirm", work_order_id: attWo.id, path: sign.path,
+        file_name: file.name, content_type: file.type, size: file.size,
+      });
+      await openAttachments(attWo);
+    } catch (e) {
+      setAttError((e as Error).message);
+    } finally { setUploading(false); }
+  }
+
+  async function handleDeleteAttachment(id: string) {
+    if (!attWo) return;
+    try {
+      await callFn("tenant-attachments", { action: "delete", id });
+      await openAttachments(attWo);
+    } catch (e) { setAttError((e as Error).message); }
+  }
+
+  function fmtSize(bytes: number | null) {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
@@ -440,6 +500,9 @@ export default function WorkOrdersPage() {
                       )}
                       <Tooltip title="Materiales / repuestos">
                         <IconButton size="small" onClick={() => openMaterials(wo)}><Inventory2 fontSize="small" /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="Adjuntos / fotos">
+                        <IconButton size="small" onClick={() => openAttachments(wo)}><AttachFile fontSize="small" /></IconButton>
                       </Tooltip>
                       <Tooltip title="Editar">
                         <IconButton size="small" onClick={() => openEdit(wo)}><Edit fontSize="small" /></IconButton>
@@ -654,6 +717,73 @@ export default function WorkOrdersPage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => { setMatWo(null); load(); }}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Diálogo Adjuntos de la OT ───────────────────────────────────────── */}
+      <Dialog open={!!attWo} onClose={() => setAttWo(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AttachFile color="primary" fontSize="small" />
+          Adjuntos — {attWo?.wo_number}
+        </DialogTitle>
+        <DialogContent>
+          {attError && <Alert severity="error" sx={{ mb: 2 }}>{attError}</Alert>}
+
+          <Button component="label" variant="outlined" startIcon={uploading ? <CircularProgress size={16} /> : <AttachFile />}
+            disabled={uploading} sx={{ mb: 2 }}>
+            {uploading ? "Subiendo…" : "Subir archivo o foto"}
+            <input type="file" hidden onChange={handleUpload}
+              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" />
+          </Button>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            Imágenes, PDF u Office. Máx. 10 MB.
+          </Typography>
+
+          {attLoading ? <Skeleton variant="rectangular" height={120} /> : (
+            attachments.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
+                Sin adjuntos. Sube evidencia del trabajo realizado.
+              </Typography>
+            ) : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {attachments.map((a) => {
+                  const isImg = (a.content_type ?? "").startsWith("image/");
+                  return (
+                    <Box key={a.id} sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1,
+                          border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
+                      {isImg && a.url ? (
+                        <Box component="img" src={a.url} alt={a.file_name}
+                          sx={{ width: 48, height: 48, objectFit: "cover", borderRadius: 1, cursor: "pointer" }}
+                          onClick={() => window.open(a.url!, "_blank")} />
+                      ) : (
+                        <Box sx={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center",
+                              bgcolor: "action.hover", borderRadius: 1 }}>
+                          {isImg ? <ImageIcon color="action" /> : <InsertDriveFile color="action" />}
+                        </Box>
+                      )}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>{a.file_name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {fmtSize(a.size_bytes)} · {new Date(a.created_at).toLocaleDateString("es-PE")}
+                        </Typography>
+                      </Box>
+                      {a.url && (
+                        <Tooltip title="Descargar / ver">
+                          <IconButton size="small" onClick={() => window.open(a.url!, "_blank")}><Download fontSize="small" /></IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="Eliminar">
+                        <IconButton size="small" color="error" onClick={() => handleDeleteAttachment(a.id)}><Delete fontSize="small" /></IconButton>
+                      </Tooltip>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAttWo(null)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>
