@@ -5,9 +5,10 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton,
 } from "@mui/material";
-import { Add, Refresh, PrecisionManufacturing, Edit, Delete, Visibility } from "@mui/icons-material";
+import { Add, Refresh, PrecisionManufacturing, Edit, Delete, Visibility, QrCode2 } from "@mui/icons-material";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
 import EquipmentDetailDrawer from "../components/EquipmentDetailDrawer";
+import EquipmentQrDialog from "../components/EquipmentQrDialog";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ export default function EquipmentPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [qrEquip, setQrEquip] = useState<Equipment | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,6 +98,18 @@ export default function EquipmentPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Deep-link desde QR: ?code=XXX abre la ficha del equipo
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) {
+      const eq = rows.find((e) => e.code === code);
+      if (eq) setDetailId(eq.id);
+      // limpiar el query para no reabrir en recargas
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [rows]);
 
   function openCreate() {
     setEditId(null);
@@ -262,6 +276,9 @@ export default function EquipmentPage() {
                       <Tooltip title="Ver detalle e historial">
                         <IconButton size="small" onClick={() => setDetailId(eq.id)}><Visibility fontSize="small" /></IconButton>
                       </Tooltip>
+                      <Tooltip title="Código QR">
+                        <IconButton size="small" onClick={() => setQrEquip(eq)}><QrCode2 fontSize="small" /></IconButton>
+                      </Tooltip>
                       <Tooltip title="Editar">
                         <IconButton size="small" onClick={() => openEdit(eq)}><Edit fontSize="small" /></IconButton>
                       </Tooltip>
@@ -364,6 +381,7 @@ export default function EquipmentPage() {
       </Dialog>
 
       <EquipmentDetailDrawer equipmentId={detailId} onClose={() => setDetailId(null)} />
+      <EquipmentQrDialog open={!!qrEquip} equipment={qrEquip} onClose={() => setQrEquip(null)} />
     </Box>
   );
 }

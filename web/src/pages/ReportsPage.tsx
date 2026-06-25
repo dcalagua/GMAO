@@ -6,7 +6,7 @@ import {
 } from "@mui/material";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, ComposedChart, Line,
 } from "recharts";
 import {
   Assessment, Download, Warning, CheckCircle,
@@ -31,7 +31,10 @@ interface Summary {
   reliability: { mttr_hours: number | null; mtbf_days: number | null; corrective_count: number };
   costs: { labor_rate: number; labor_hours: number; labor_cost: number; materials_cost: number; total_cost: number };
   top_equipment: TopEquipment[];
+  monthly: MonthlyPoint[];
 }
+
+interface MonthlyPoint { month: string; created: number; completed: number; cost: number; }
 
 interface TopEquipment {
   code: string; name: string; wo_count: number; corrective_count: number; materials_cost: number;
@@ -409,6 +412,35 @@ export default function ReportsPage() {
           calcular el costo de mano de obra de las OTs.
         </Alert>
       )}
+
+      {/* ── Tendencia mensual ───────────────────────────────────────────────── */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+            Tendencia de OTs y costos (últimos 12 meses)
+          </Typography>
+          {loading ? <Skeleton variant="rectangular" height={280} /> : (
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={(summary?.monthly ?? []).map((m) => ({
+                mes: m.month.slice(2),  // YY-MM
+                Creadas: m.created,
+                Completadas: m.completed,
+                Costo: m.cost,
+              }))}>
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => `S/${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
+                <RTooltip formatter={(value, name) => name === "Costo" ? money(Number(value)) : value} />
+                <Legend />
+                <Bar yAxisId="left" dataKey="Creadas" fill="#90CAF9" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Completadas" fill="#66BB6A" radius={[3, 3, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="Costo" stroke="#E65100" strokeWidth={2} dot={{ r: 3 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Equipos con más intervenciones ──────────────────────────────────── */}
       <Card sx={{ mb: 3 }}>
