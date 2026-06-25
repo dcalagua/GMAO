@@ -22,11 +22,11 @@ interface TenantUser {
   created_at: string;
 }
 
-const ROLE_COLOR: Record<string, "error" | "warning" | "info" | "default"> = {
-  admin: "error", technician: "warning", viewer: "info",
+const ROLE_COLOR: Record<string, "error" | "warning" | "info" | "default" | "secondary"> = {
+  owner: "secondary", admin: "error", technician: "warning", viewer: "info",
 };
 const ROLE_LABEL: Record<string, string> = {
-  admin: "Administrador", technician: "Técnico", viewer: "Lector",
+  owner: "Propietario", admin: "Administrador", technician: "Técnico", viewer: "Lector",
 };
 
 function fmtDate(iso: string | null) {

@@ -45,23 +45,25 @@ interface PlanOverdue {
 // ─── Paletas ──────────────────────────────────────────────────────────────────
 
 const WO_STATUS_COLORS: Record<string, string> = {
-  created:     "#90CAF9",
+  draft:       "#90CAF9",
   planned:     "#FFB74D",
+  released:    "#BA68C8",
   in_progress: "#66BB6A",
   completed:   "#42A5F5",
-  cancelled:   "#BDBDBD",
+  closed:      "#26A69A",
+  canceled:    "#BDBDBD",
 };
 const WO_STATUS_LABELS: Record<string, string> = {
-  created: "Creada", planned: "Planificada", in_progress: "En progreso",
-  completed: "Completada", cancelled: "Cancelada",
+  draft: "Borrador", planned: "Planificada", released: "Liberada",
+  in_progress: "En progreso", completed: "Completada", closed: "Cerrada", canceled: "Cancelada",
 };
 const WO_TYPE_COLORS: Record<string, string> = {
   corrective: "#EF5350", preventive: "#66BB6A", predictive: "#42A5F5",
-  other: "#BDBDBD",
+  inspection: "#FFB74D", other: "#BDBDBD",
 };
 const WO_TYPE_LABELS: Record<string, string> = {
   corrective: "Correctivo", preventive: "Preventivo",
-  predictive: "Predictivo", other: "Otro",
+  predictive: "Predictivo", inspection: "Inspección", other: "Otro",
 };
 const CRIT_COLORS: Record<string, string> = {
   critical: "#D32F2F", high: "#F57C00", medium: "#1976D2", low: "#388E3C",

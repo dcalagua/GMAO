@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
             ${d.description as string ?? null}, ${d.equipment_type as string ?? null},
             ${d.manufacturer as string ?? null}, ${d.model as string ?? null},
             ${d.serial_number as string ?? null}, ${d.install_date as string ?? null},
-            ${d.status as string ?? "active"}, ${d.criticality as string ?? "medium"},
+            ${d.status as string ?? "operational"}, ${d.criticality as string ?? "medium"},
             ${d.functional_location_id as string ?? null}
           )
           RETURNING *

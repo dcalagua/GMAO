@@ -38,16 +38,17 @@ interface Location { id: string; code: string; name: string; level: number; }
 const EMPTY: EqForm = {
   code: "", name: "", description: "", equipment_type: "",
   manufacturer: "", model: "", serial_number: "",
-  install_date: "", status: "active", criticality: "medium", functional_location_id: "",
+  install_date: "", status: "operational", criticality: "medium", functional_location_id: "",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<string, "success" | "default" | "error"> = {
-  active: "success", inactive: "default", scrapped: "error",
+const STATUS_COLOR: Record<string, "success" | "default" | "error" | "warning"> = {
+  operational: "success", down: "error", maintenance: "warning", decommissioned: "default",
 };
 const STATUS_LABEL: Record<string, string> = {
-  active: "Activo", inactive: "Inactivo", scrapped: "Dado de baja",
+  operational: "Operativo", down: "Fuera de servicio",
+  maintenance: "En mantenimiento", decommissioned: "Dado de baja",
 };
 const CRIT_COLOR: Record<string, "error" | "warning" | "info" | "default"> = {
   critical: "error", high: "warning", medium: "info", low: "default",
@@ -340,9 +341,10 @@ export default function EquipmentPage() {
               </Box>
               <TextField label="Estado" select value={form.status}
                 onChange={(e) => set("status", e.target.value)} fullWidth>
-                <MenuItem value="active">Activo</MenuItem>
-                <MenuItem value="inactive">Inactivo</MenuItem>
-                <MenuItem value="scrapped">Dado de baja</MenuItem>
+                <MenuItem value="operational">Operativo</MenuItem>
+                <MenuItem value="down">Fuera de servicio</MenuItem>
+                <MenuItem value="maintenance">En mantenimiento</MenuItem>
+                <MenuItem value="decommissioned">Dado de baja</MenuItem>
               </TextField>
             </Box>
           </DialogContent>

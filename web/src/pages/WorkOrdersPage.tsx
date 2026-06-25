@@ -45,30 +45,30 @@ interface WoForm {
 
 const EMPTY: WoForm = {
   title: "", description: "", work_order_type: "corrective",
-  priority: "medium", status: "created", equipment_id: "",
+  priority: "medium", status: "draft", equipment_id: "",
   assigned_to_user_id: "", assigned_to_name: "",
   planned_start: "", planned_end: "", estimated_hours: "", actual_hours: "", notes: "",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<string, "default" | "info" | "warning" | "success" | "error"> = {
-  created: "default", planned: "info", in_progress: "warning",
-  completed: "success", cancelled: "error",
+const STATUS_COLOR: Record<string, "default" | "info" | "warning" | "success" | "error" | "secondary"> = {
+  draft: "default", planned: "info", released: "secondary", in_progress: "warning",
+  completed: "success", closed: "success", canceled: "error",
 };
 const STATUS_LABEL: Record<string, string> = {
-  created: "Creada", planned: "Planificada", in_progress: "En progreso",
-  completed: "Completada", cancelled: "Cancelada",
+  draft: "Borrador", planned: "Planificada", released: "Liberada",
+  in_progress: "En progreso", completed: "Completada", closed: "Cerrada", canceled: "Cancelada",
 };
 const PRIO_COLOR: Record<string, "default" | "info" | "warning" | "error"> = {
-  low: "default", medium: "info", high: "warning", critical: "error",
+  low: "default", medium: "info", high: "warning", urgent: "error",
 };
 const PRIO_LABEL: Record<string, string> = {
-  low: "Baja", medium: "Media", high: "Alta", critical: "Crítica",
+  low: "Baja", medium: "Media", high: "Alta", urgent: "Urgente",
 };
 const TYPE_LABEL: Record<string, string> = {
   corrective: "Correctivo", preventive: "Preventivo",
-  predictive: "Predictivo", improvement: "Mejora",
+  predictive: "Predictivo", inspection: "Inspección",
 };
 
 function fmt(iso: string | null) {
@@ -356,23 +356,25 @@ export default function WorkOrdersPage() {
                   <MenuItem value="corrective">Correctivo</MenuItem>
                   <MenuItem value="preventive">Preventivo</MenuItem>
                   <MenuItem value="predictive">Predictivo</MenuItem>
-                  <MenuItem value="improvement">Mejora</MenuItem>
+                  <MenuItem value="inspection">Inspección</MenuItem>
                 </TextField>
                 <TextField label="Prioridad" select value={form.priority}
                   onChange={(e) => set("priority", e.target.value)} fullWidth>
                   <MenuItem value="low">Baja</MenuItem>
                   <MenuItem value="medium">Media</MenuItem>
                   <MenuItem value="high">Alta</MenuItem>
-                  <MenuItem value="critical">Crítica</MenuItem>
+                  <MenuItem value="urgent">Urgente</MenuItem>
                 </TextField>
               </Box>
               <TextField label="Estado" select value={form.status}
                 onChange={(e) => set("status", e.target.value)} fullWidth>
-                <MenuItem value="created">Creada</MenuItem>
+                <MenuItem value="draft">Borrador</MenuItem>
                 <MenuItem value="planned">Planificada</MenuItem>
+                <MenuItem value="released">Liberada</MenuItem>
                 <MenuItem value="in_progress">En progreso</MenuItem>
                 <MenuItem value="completed">Completada</MenuItem>
-                <MenuItem value="cancelled">Cancelada</MenuItem>
+                <MenuItem value="closed">Cerrada</MenuItem>
+                <MenuItem value="canceled">Cancelada</MenuItem>
               </TextField>
               <TextField label="Equipo" select value={form.equipment_id}
                 onChange={(e) => set("equipment_id", e.target.value)} fullWidth>
