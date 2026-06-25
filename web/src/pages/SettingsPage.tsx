@@ -28,6 +28,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     callFn<{ data: SettingsData; role: string; email_configured: boolean }>(
@@ -52,6 +54,16 @@ export default function SettingsPage() {
       setSuccess(true);
     } catch (e) { setError((e as Error).message); }
     finally { setSaving(false); }
+  }
+
+  async function handleTestEmail() {
+    setTesting(true); setTestResult(null);
+    try {
+      const res = await callFn<{ sent_to: string }>("tenant-settings", { action: "test_email" });
+      setTestResult({ ok: true, msg: `Email de prueba enviado a ${res.sent_to}. Revisa tu bandeja.` });
+    } catch (e) {
+      setTestResult({ ok: false, msg: (e as Error).message });
+    } finally { setTesting(false); }
   }
 
   if (loading) {
@@ -142,12 +154,26 @@ export default function SettingsPage() {
           <FormControlLabel
             control={<Switch checked={form.notify_email} disabled={!canEdit || !emailConfigured}
               onChange={(e) => set("notify_email", e.target.checked)} />}
-            label="Enviar notificaciones también por email" />
-          {!emailConfigured && (
+            label="Enviar notificaciones también por email (Microsoft 365)" />
+          {!emailConfigured ? (
             <Alert severity="warning" sx={{ mt: 2 }}>
-              El envío de emails requiere configurar el secret <code>RESEND_API_KEY</code> en Supabase.
+              El envío de emails requiere configurar en Supabase los secrets
+              <code> AZURE_TENANT_ID</code>, <code>AZURE_CLIENT_ID</code>,
+              <code> AZURE_CLIENT_SECRET</code> y <code>MAIL_FROM</code>.
               Mientras tanto, las notificaciones funcionan dentro de la aplicación (campana 🔔).
             </Alert>
+          ) : canEdit && (
+            <Box sx={{ mt: 2 }}>
+              <Button variant="outlined" size="small" onClick={handleTestEmail} disabled={testing}
+                startIcon={testing ? <CircularProgress size={14} /> : <Email />}>
+                {testing ? "Enviando…" : "Enviar email de prueba"}
+              </Button>
+              {testResult && (
+                <Alert severity={testResult.ok ? "success" : "error"} sx={{ mt: 1.5 }}>
+                  {testResult.msg}
+                </Alert>
+              )}
+            </Box>
           )}
         </CardContent>
       </Card>
