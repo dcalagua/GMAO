@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
         const rows = await sql`
           SELECT e.id, e.code, e.name, e.description, e.equipment_type,
                  e.manufacturer, e.model, e.serial_number,
-                 e.installation_date, e.status, e.criticality,
+                 e.install_date, e.status, e.criticality,
                  e.sap_key, e.created_at, e.updated_at,
                  fl.name AS location_name,
                  e.functional_location_id
@@ -35,12 +35,12 @@ Deno.serve(async (req: Request) => {
         const [row] = await sql`
           INSERT INTO equipment
             (code, name, description, equipment_type, manufacturer, model,
-             serial_number, installation_date, status, criticality, functional_location_id)
+             serial_number, install_date, status, criticality, functional_location_id)
           VALUES (
             ${d.code as string}, ${d.name as string},
             ${d.description as string ?? null}, ${d.equipment_type as string ?? null},
             ${d.manufacturer as string ?? null}, ${d.model as string ?? null},
-            ${d.serial_number as string ?? null}, ${d.installation_date as string ?? null},
+            ${d.serial_number as string ?? null}, ${d.install_date as string ?? null},
             ${d.status as string ?? "active"}, ${d.criticality as string ?? "medium"},
             ${d.functional_location_id as string ?? null}
           )

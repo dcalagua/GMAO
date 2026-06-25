@@ -19,7 +19,7 @@ interface Equipment {
   manufacturer: string | null;
   model: string | null;
   serial_number: string | null;
-  installation_date: string | null;
+  install_date: string | null;
   status: string;
   criticality: string;
   location_name: string | null;
@@ -29,14 +29,14 @@ interface Equipment {
 interface EqForm {
   code: string; name: string; description: string;
   equipment_type: string; manufacturer: string; model: string;
-  serial_number: string; installation_date: string;
+  serial_number: string; install_date: string;
   status: string; criticality: string;
 }
 
 const EMPTY: EqForm = {
   code: "", name: "", description: "", equipment_type: "",
   manufacturer: "", model: "", serial_number: "",
-  installation_date: "", status: "active", criticality: "medium",
+  install_date: "", status: "active", criticality: "medium",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export default function EquipmentPage() {
       code: eq.code, name: eq.name, description: eq.description ?? "",
       equipment_type: eq.equipment_type ?? "", manufacturer: eq.manufacturer ?? "",
       model: eq.model ?? "", serial_number: eq.serial_number ?? "",
-      installation_date: eq.installation_date?.slice(0, 10) ?? "",
+      install_date: eq.install_date?.slice(0, 10) ?? "",
       status: eq.status, criticality: eq.criticality,
     });
     setSaveError(null);
@@ -130,7 +130,7 @@ export default function EquipmentPage() {
         manufacturer:     form.manufacturer || undefined,
         model:            form.model || undefined,
         serial_number:    form.serial_number || undefined,
-        installation_date: form.installation_date || undefined,
+        install_date: form.install_date || undefined,
       };
       if (editId) {
         await callFn("tenant-equipment", { action: "update", id: editId, data });
@@ -314,8 +314,8 @@ export default function EquipmentPage() {
               <Box sx={{ display: "flex", gap: 2 }}>
                 <TextField label="N° de serie" value={form.serial_number}
                   onChange={(e) => set("serial_number", e.target.value)} fullWidth />
-                <TextField label="Fecha instalación" type="date" value={form.installation_date}
-                  onChange={(e) => set("installation_date", e.target.value)}
+                <TextField label="Fecha instalación" type="date" value={form.install_date}
+                  onChange={(e) => set("install_date", e.target.value)}
                   fullWidth slotProps={{ inputLabel: { shrink: true } }} />
               </Box>
               <TextField label="Estado" select value={form.status}
