@@ -71,14 +71,23 @@ export function pushConfigured(): boolean {
   return !!Deno.env.get("FCM_SERVICE_ACCOUNT");
 }
 
+// El secret puede venir como JSON directo o codificado en base64 (un solo token).
+function parseServiceAccount(raw: string): ServiceAccount | null {
+  const trimmed = raw.trim();
+  const txt = trimmed.startsWith("{") ? trimmed : new TextDecoder().decode(
+    Uint8Array.from(atob(trimmed), (c) => c.charCodeAt(0)),
+  );
+  try { return JSON.parse(txt) as ServiceAccount; } catch { return null; }
+}
+
 /** Envía una notificación a una lista de device tokens. Best-effort. */
 export async function sendPush(
   tokens: string[], title: string, body: string, data?: Record<string, string>,
 ): Promise<void> {
   const raw = Deno.env.get("FCM_SERVICE_ACCOUNT");
   if (!raw || tokens.length === 0) return;
-  let sa: ServiceAccount;
-  try { sa = JSON.parse(raw); } catch { return; }
+  const sa = parseServiceAccount(raw);
+  if (!sa) return;
 
   try {
     const access = await getAccessToken(sa);
