@@ -9,7 +9,7 @@ import {
 import {
   Dashboard, Business, Menu as MenuIcon, Build,
   ChevronLeft, Logout, Person, PrecisionManufacturing, Assignment,
-  CalendarMonth, AccountTree, Assessment, People, Settings,
+  CalendarMonth, AccountTree, Assessment, People, Settings, Inventory2,
 } from "@mui/icons-material";
 import { Divider as MuiDivider } from "@mui/material";
 import { supabase } from "../../supabaseClient";
@@ -31,6 +31,7 @@ const NAV_GMAO = [
   { label: "Equipos",            path: "/equipment",         icon: <PrecisionManufacturing /> },
   { label: "Órdenes de Trabajo", path: "/work-orders",       icon: <Assignment /> },
   { label: "Planes de Mant.",    path: "/maintenance-plans", icon: <CalendarMonth /> },
+  { label: "Inventario",         path: "/inventory",         icon: <Inventory2 /> },
   { label: "Reportes",           path: "/reports",           icon: <Assessment /> },
   { label: "Usuarios",           path: "/users",             icon: <People /> },
   { label: "Configuración",      path: "/settings",          icon: <Settings /> },
