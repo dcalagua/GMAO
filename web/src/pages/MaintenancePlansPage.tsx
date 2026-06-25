@@ -4,8 +4,10 @@ import {
   TableContainer, TableHead, TableRow, Chip, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton, Switch, FormControlLabel,
+  Snackbar,
 } from "@mui/material";
-import { Add, Refresh, CalendarMonth, Edit, Delete } from "@mui/icons-material";
+import { Add, Refresh, CalendarMonth, Edit, Delete, PlayArrow } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ function freqLabel(plan: Plan) {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function MaintenancePlansPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Plan[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +76,13 @@ export default function MaintenancePlansPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Generar OT
+  const [genPlan, setGenPlan] = useState<Plan | null>(null);
+  const [genDate, setGenDate] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; woNumber: string }>({ open: false, woNumber: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,6 +159,31 @@ export default function MaintenancePlansPage() {
     finally { setDeleting(null); }
   }
 
+  function openGenerate(plan: Plan) {
+    setGenPlan(plan);
+    setGenDate(new Date().toISOString().slice(0, 10));
+    setGenError(null);
+  }
+
+  async function handleGenerate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!genPlan) return;
+    setGenerating(true); setGenError(null);
+    try {
+      const res = await callFn<{ wo_number: string }>(
+        "tenant-maintenance-plans",
+        { action: "generate_wo", id: genPlan.id, planned_start: genDate }
+      );
+      invalidateCache("plans:list");
+      invalidateCache("work-orders:list");
+      await load();
+      setGenPlan(null);
+      setSnackbar({ open: true, woNumber: res.wo_number });
+    } catch (e) {
+      setGenError((e as Error).message);
+    } finally { setGenerating(false); }
+  }
+
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
@@ -220,6 +255,13 @@ export default function MaintenancePlansPage() {
                       color={p.is_active ? "success" : "default"} size="small" />
                   </TableCell>
                   <TableCell align="right">
+                    {p.is_active && (
+                      <Tooltip title="Generar OT">
+                        <IconButton size="small" color="success" onClick={() => openGenerate(p)}>
+                          <PlayArrow fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title="Editar">
                       <IconButton size="small" onClick={() => openEdit(p)}><Edit fontSize="small" /></IconButton>
                     </Tooltip>
@@ -236,7 +278,61 @@ export default function MaintenancePlansPage() {
         </TableContainer>
       </Card>
 
-      {/* ── Diálogo ─────────────────────────────────────────────────────────── */}
+      {/* ── Diálogo Generar OT ──────────────────────────────────────────────── */}
+      <Dialog open={!!genPlan} onClose={() => setGenPlan(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <PlayArrow color="success" fontSize="small" />
+          Generar Orden de Trabajo
+        </DialogTitle>
+        <Box component="form" onSubmit={handleGenerate}>
+          <DialogContent>
+            {genError && <Alert severity="error" sx={{ mb: 2 }}>{genError}</Alert>}
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Se creará una OT preventiva a partir del plan:
+            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+              {genPlan?.code} — {genPlan?.name}
+            </Typography>
+            {genPlan?.equipment_name && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Equipo: {genPlan.equipment_code} — {genPlan.equipment_name}
+              </Typography>
+            )}
+            <TextField
+              label="Fecha de inicio planificada *"
+              type="date"
+              value={genDate}
+              onChange={(e) => setGenDate(e.target.value)}
+              required fullWidth
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ mt: 1 }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button onClick={() => setGenPlan(null)} disabled={generating}>Cancelar</Button>
+            <Button type="submit" variant="contained" color="success" disabled={generating}
+              startIcon={generating ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}>
+              {generating ? "Generando…" : "Generar OT"}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* ── Snackbar OT creada ──────────────────────────────────────────────── */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={8000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        message={`OT creada: ${snackbar.woNumber}`}
+        action={
+          <Button color="inherit" size="small" onClick={() => { setSnackbar((s) => ({ ...s, open: false })); navigate("/work-orders"); }}>
+            Ver OTs
+          </Button>
+        }
+      />
+
+      {/* ── Diálogo crear/editar plan ───────────────────────────────────────── */}
       <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>{editId ? "Editar plan" : "Nuevo plan de mantenimiento"}</DialogTitle>
         <Box component="form" onSubmit={handleSave}>
