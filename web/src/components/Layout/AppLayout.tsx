@@ -17,9 +17,12 @@ import { preloadGmao } from "../../lib/api";
 
 const DRAWER_WIDTH = 240;
 
-const NAV_PLATFORM = [
+const NAV_HOME = [
   { label: "Dashboard", path: "/dashboard", icon: <Dashboard /> },
-  { label: "Tenants",   path: "/tenants",   icon: <Business /> },
+];
+
+const NAV_PLATFORM = [
+  { label: "Tenants", path: "/tenants", icon: <Business /> },
 ];
 
 const NAV_GMAO = [
@@ -84,7 +87,7 @@ export default function AppLayout({ session }: AppLayoutProps) {
 
       {/* Navegación */}
       <List sx={{ flex: 1, pt: 1 }}>
-        {isPlatformAdmin && NAV_PLATFORM.map((item) => {
+        {NAV_HOME.map((item) => {
           const active = location.pathname === item.path;
           return (
             <ListItemButton
@@ -107,6 +110,35 @@ export default function AppLayout({ session }: AppLayoutProps) {
         })}
 
         {isPlatformAdmin && <MuiDivider sx={{ mx: 2, my: 1 }} />}
+        {isPlatformAdmin && (
+          <Typography variant="caption" color="text.disabled"
+            sx={{ px: 3, pb: 0.5, display: "block", textTransform: "uppercase", letterSpacing: 1 }}>
+            Plataforma
+          </Typography>
+        )}
+        {isPlatformAdmin && NAV_PLATFORM.map((item) => {
+          const active = location.pathname === item.path;
+          return (
+            <ListItemButton
+              key={item.path}
+              onClick={() => { navigate(item.path); if (isMobile) setDrawerOpen(false); }}
+              selected={active}
+              sx={{
+                mx: 1, borderRadius: 2, mb: 0.5,
+                "&.Mui-selected": {
+                  bgcolor: "primary.main", color: "white",
+                  "& .MuiListItemIcon-root": { color: "white" },
+                  "&:hover": { bgcolor: "primary.dark" },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          );
+        })}
+
+        <MuiDivider sx={{ mx: 2, my: 1 }} />
         <Typography variant="caption" color="text.disabled"
           sx={{ px: 3, pb: 0.5, display: "block", textTransform: "uppercase", letterSpacing: 1 }}>
           GMAO

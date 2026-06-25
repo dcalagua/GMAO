@@ -50,7 +50,7 @@ export default function App() {
   return (
     <Routes>
       <Route element={<AppLayout session={session} />}>
-        <Route path="/" element={<Navigate to="/tenants" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/tenants" element={<TenantsPage />} />
         <Route path="/locations" element={<LocationsPage />} />

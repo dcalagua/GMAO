@@ -79,6 +79,51 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true });
       }
 
+      // ── Detalle + historial ────────────────────────────────────────────────
+      if (action === "detail") {
+        const { id } = body as { id: string };
+        if (!id) return json({ error: "MISSING_ID" }, 400);
+
+        const [equipment] = await sql`
+          SELECT e.*, fl.name AS location_name, fl.code AS location_code
+          FROM equipment e
+          LEFT JOIN functional_locations fl ON fl.id = e.functional_location_id
+          WHERE e.id = ${id}
+        `;
+        if (!equipment) return json({ error: "NOT_FOUND" }, 404);
+
+        const workOrders = await sql`
+          SELECT id, COALESCE(wo_number, code) AS wo_number, title,
+                 COALESCE(work_order_type, type) AS work_order_type,
+                 priority, status,
+                 COALESCE(planned_start, scheduled_start) AS planned_start,
+                 actual_hours, assigned_to_name, created_at
+          FROM work_orders
+          WHERE equipment_id = ${id}
+          ORDER BY created_at DESC
+          LIMIT 50
+        `;
+
+        const plans = await sql`
+          SELECT id, code, name, frequency_value, frequency_unit,
+                 next_execution, last_execution, is_active
+          FROM maintenance_plans
+          WHERE equipment_id = ${id}
+          ORDER BY is_active DESC, next_execution ASC NULLS LAST
+        `;
+
+        // métricas agregadas
+        const [stats] = await sql`
+          SELECT
+            COUNT(*)::int AS total_wo,
+            COUNT(*) FILTER (WHERE status IN ('completed','closed'))::int AS completed_wo,
+            COALESCE(SUM(actual_hours) FILTER (WHERE status IN ('completed','closed')), 0)::numeric AS total_hours
+          FROM work_orders WHERE equipment_id = ${id}
+        `;
+
+        return json({ equipment, work_orders: workOrders, plans, stats });
+      }
+
       return json({ error: "UNKNOWN_ACTION" }, 400);
     });
 

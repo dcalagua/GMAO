@@ -5,8 +5,9 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton,
 } from "@mui/material";
-import { Add, Refresh, PrecisionManufacturing, Edit, Delete } from "@mui/icons-material";
+import { Add, Refresh, PrecisionManufacturing, Edit, Delete, Visibility } from "@mui/icons-material";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
+import EquipmentDetailDrawer from "../components/EquipmentDetailDrawer";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ export default function EquipmentPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -257,6 +259,9 @@ export default function EquipmentPage() {
                     </TableCell>
                     <TableCell>{fmt(eq.created_at)}</TableCell>
                     <TableCell align="right">
+                      <Tooltip title="Ver detalle e historial">
+                        <IconButton size="small" onClick={() => setDetailId(eq.id)}><Visibility fontSize="small" /></IconButton>
+                      </Tooltip>
                       <Tooltip title="Editar">
                         <IconButton size="small" onClick={() => openEdit(eq)}><Edit fontSize="small" /></IconButton>
                       </Tooltip>
@@ -357,6 +362,8 @@ export default function EquipmentPage() {
           </DialogActions>
         </Box>
       </Dialog>
+
+      <EquipmentDetailDrawer equipmentId={detailId} onClose={() => setDetailId(null)} />
     </Box>
   );
 }
