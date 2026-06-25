@@ -8,6 +8,7 @@ import TenantsPage from "./pages/TenantsPage";
 import DashboardPage from "./pages/DashboardPage";
 import EquipmentPage from "./pages/EquipmentPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
+import MaintenancePlansPage from "./pages/MaintenancePlansPage";
 import { CircularProgress, Box } from "@mui/material";
 
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/tenants" element={<TenantsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />
         <Route path="/work-orders" element={<WorkOrdersPage />} />
+        <Route path="/maintenance-plans" element={<MaintenancePlansPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
