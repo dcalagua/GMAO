@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import {
   Assessment, Download, Warning, CheckCircle,
-  PrecisionManufacturing, Assignment, CalendarMonth,
+  PrecisionManufacturing, Assignment, CalendarMonth, Build, Paid,
 } from "@mui/icons-material";
 import { callFn, callFnCached } from "../lib/api";
 import { exportCsv } from "../lib/csv";
@@ -28,6 +28,13 @@ interface Summary {
   equipment_by_criticality: { criticality: string; count: number }[];
   plans_due_soon: PlanDue[];
   plans_overdue: PlanOverdue[];
+  reliability: { mttr_hours: number | null; mtbf_days: number | null; corrective_count: number };
+  costs: { labor_rate: number; labor_hours: number; labor_cost: number; materials_cost: number; total_cost: number };
+  top_equipment: TopEquipment[];
+}
+
+interface TopEquipment {
+  code: string; name: string; wo_count: number; corrective_count: number; materials_cost: number;
 }
 
 interface PlanDue {
@@ -106,6 +113,14 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function money(n: number) {
+  return `S/ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function num(n: number | null, suffix: string, digits = 1) {
+  if (n == null) return "—";
+  return `${n.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: digits })}${suffix}`;
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -363,6 +378,83 @@ export default function ReportsPage() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* ── Confiabilidad y Costos ──────────────────────────────────────────── */}
+      <Grid container spacing={2.5} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <KpiCard title="MTTR" value={num(summary?.reliability.mttr_hours ?? null, " h")}
+            icon={<Build sx={{ color: "white", fontSize: 22 }} />} color="#7B1FA2"
+            sub="Tiempo medio de reparación" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <KpiCard title="MTBF" value={num(summary?.reliability.mtbf_days ?? null, " d", 0)}
+            icon={<CheckCircle sx={{ color: "white", fontSize: 22 }} />} color="#00838F"
+            sub="Tiempo medio entre fallas" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <KpiCard title="Correctivos" value={summary?.reliability.corrective_count ?? 0}
+            icon={<Warning sx={{ color: "white", fontSize: 22 }} />} color="#EF5350"
+            sub="OTs correctivas totales" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <KpiCard title="Costo total mant." value={money(summary?.costs.total_cost ?? 0)}
+            icon={<Paid sx={{ color: "white", fontSize: 22 }} />} color="#2E7D32"
+            sub={`MO ${money(summary?.costs.labor_cost ?? 0)} + Mat. ${money(summary?.costs.materials_cost ?? 0)}`} />
+        </Grid>
+      </Grid>
+
+      {(summary?.costs.labor_rate ?? 0) === 0 && !loading && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          La tarifa de mano de obra es S/ 0. Configúrala en <strong>Configuración → Costos</strong> para
+          calcular el costo de mano de obra de las OTs.
+        </Alert>
+      )}
+
+      {/* ── Equipos con más intervenciones ──────────────────────────────────── */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <PrecisionManufacturing color="primary" fontSize="small" />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Equipos con más intervenciones</Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          {loading ? <Skeleton variant="rectangular" height={120} /> : (
+            (summary?.top_equipment?.length ?? 0) === 0 ? (
+              <Typography variant="body2" color="text.secondary">Aún no hay OTs asociadas a equipos.</Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Equipo</TableCell>
+                      <TableCell align="right">OTs totales</TableCell>
+                      <TableCell align="right">Correctivas</TableCell>
+                      <TableCell align="right">Costo materiales</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {summary?.top_equipment.map((e) => (
+                      <TableRow key={e.code} hover>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{e.name}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{e.code}</Typography>
+                        </TableCell>
+                        <TableCell align="right">{e.wo_count}</TableCell>
+                        <TableCell align="right">
+                          {e.corrective_count > 0
+                            ? <Chip label={e.corrective_count} color="error" size="small" variant="outlined" />
+                            : "—"}
+                        </TableCell>
+                        <TableCell align="right">{money(Number(e.materials_cost))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Planes próximos ───────────────────────────────────────────────── */}
       <Card>
