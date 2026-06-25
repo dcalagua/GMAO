@@ -25,8 +25,10 @@ export interface TenantContext {
   status: string;
 }
 
-// Conexión administrativa (sin search_path de tenant) para resolver contexto.
-const adminSql = postgres(DB_URL, { prepare: false, max: 5 });
+// Pools a nivel de módulo — reutilizados entre invocaciones calientes.
+// Evita abrir nuevas conexiones TCP/TLS en cada request (3-5s overhead).
+const adminSql  = postgres(DB_URL, { prepare: false, max: 5 });
+const tenantSql = postgres(DB_URL, { prepare: false, max: 10 });
 
 /**
  * Resuelve el tenant de un usuario autenticado a partir de su auth_user_id.
@@ -69,20 +71,12 @@ export async function withTenantConnection<T>(
   if (!/^tenant_[a-z0-9_]{1,50}$/.test(ctx.schemaName)) {
     throw new Error("INVALID_SCHEMA_NAME");
   }
-
-  const sql = postgres(DB_URL, {
-    prepare: false,
-    max: 3,
-    connection: {
-      search_path: `${ctx.schemaName}, platform, public`,
-    },
+  // SET LOCAL dentro de transacción: el search_path queda aislado a esta tx.
+  // Seguro para requests concurrentes en el mismo pool.
+  return await tenantSql.begin(async (tx) => {
+    await tx.unsafe(`SET LOCAL search_path TO "${ctx.schemaName}", platform, public`);
+    return await work(tx as unknown as ReturnType<typeof postgres>);
   });
-
-  try {
-    return await work(sql);
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
 }
 
 /** Extrae el auth_user_id (sub) del JWT de Supabase sin verificar firma aquí;
