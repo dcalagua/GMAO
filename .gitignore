@@ -1,0 +1,24 @@
+# Supabase
+.supabase/
+supabase/.temp/
+supabase/seed.sql
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+dist/
+.next/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+*.user
