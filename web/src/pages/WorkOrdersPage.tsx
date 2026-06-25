@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Typography, Button, Card, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton,
@@ -7,10 +7,11 @@ import {
 } from "@mui/material";
 import {
   Add, Refresh, Assignment, Edit, Delete, PlayArrow, CheckCircle, Lock, Inventory2,
-  AttachFile, InsertDriveFile, Image as ImageIcon, Download,
+  AttachFile, InsertDriveFile, Image as ImageIcon, Download, Draw, Verified,
 } from "@mui/icons-material";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
 import { supabase } from "../supabaseClient";
+import SignaturePad, { type SignaturePadHandle } from "../components/SignaturePad";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,9 @@ interface WorkOrder {
   assigned_to_user_id: string | null;
   assigned_to_name: string | null;
   materials_cost: number | null;
+  signed_by_name: string | null;
+  signed_at: string | null;
+  signature_path: string | null;
   created_at: string;
 }
 
@@ -119,6 +123,12 @@ export default function WorkOrdersPage() {
   const [attLoading, setAttLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [attError, setAttError] = useState<string | null>(null);
+  // Firma de conformidad
+  const [signWo, setSignWo] = useState<WorkOrder | null>(null);
+  const [signerName, setSignerName] = useState("");
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
+  const sigRef = useRef<SignaturePadHandle>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -361,6 +371,43 @@ export default function WorkOrdersPage() {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  // ── Firma de conformidad ────────────────────────────────────────────────────
+  function openSign(wo: WorkOrder) {
+    setSignWo(wo); setSignerName(""); setSignError(null);
+  }
+
+  async function handleSign(e: React.FormEvent) {
+    e.preventDefault();
+    if (!signWo) return;
+    if (sigRef.current?.isEmpty()) { setSignError("Dibuja la firma antes de guardar."); return; }
+    setSigning(true); setSignError(null);
+    try {
+      const blob = await sigRef.current!.toBlob();
+      let signaturePath: string | undefined;
+      if (blob) {
+        const fileName = `firma_${signWo.wo_number}.png`;
+        const sign = await callFn<{ path: string; token: string }>(
+          "tenant-attachments", { action: "upload_url", work_order_id: signWo.id, file_name: fileName });
+        const { error } = await supabase.storage.from("wo-attachments")
+          .uploadToSignedUrl(sign.path, sign.token, blob, { contentType: "image/png" });
+        if (error) throw new Error(error.message);
+        await callFn("tenant-attachments", {
+          action: "confirm", work_order_id: signWo.id, path: sign.path,
+          file_name: fileName, content_type: "image/png", size: blob.size,
+        });
+        signaturePath = sign.path;
+      }
+      await callFn("tenant-work-orders", {
+        action: "sign", id: signWo.id, signed_by_name: signerName, signature_path: signaturePath,
+      });
+      invalidateCache("work-orders:list");
+      await load();
+      setSignWo(null);
+    } catch (e) {
+      setSignError((e as Error).message);
+    } finally { setSigning(false); }
+  }
+
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
@@ -495,6 +542,19 @@ export default function WorkOrdersPage() {
                                 <Lock fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                          )}
+                          {(wo.status === "completed" || wo.status === "closed") && (
+                            wo.signed_by_name ? (
+                              <Tooltip title={`Firmado por ${wo.signed_by_name}`}>
+                                <Verified fontSize="small" color="success" sx={{ verticalAlign: "middle", mx: 0.5 }} />
+                              </Tooltip>
+                            ) : (
+                              <Tooltip title="Firmar conformidad">
+                                <IconButton size="small" color="primary" onClick={() => openSign(wo)}>
+                                  <Draw fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )
                           )}
                         </>
                       )}
@@ -785,6 +845,32 @@ export default function WorkOrdersPage() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setAttWo(null)}>Cerrar</Button>
         </DialogActions>
+      </Dialog>
+
+      {/* ── Diálogo Firma de conformidad ────────────────────────────────────── */}
+      <Dialog open={!!signWo} onClose={() => setSignWo(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Draw color="primary" fontSize="small" />
+          Firma de conformidad — {signWo?.wo_number}
+        </DialogTitle>
+        <Box component="form" onSubmit={handleSign}>
+          <DialogContent>
+            {signError && <Alert severity="error" sx={{ mb: 2 }}>{signError}</Alert>}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              El cliente o supervisor firma dando conformidad del trabajo realizado.
+            </Typography>
+            <TextField label="Nombre de quien firma *" value={signerName}
+              onChange={(e) => setSignerName(e.target.value)} required fullWidth sx={{ mb: 2 }} />
+            <SignaturePad ref={sigRef} />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button onClick={() => setSignWo(null)} disabled={signing}>Cancelar</Button>
+            <Button type="submit" variant="contained" disabled={signing}
+              startIcon={signing ? <CircularProgress size={16} color="inherit" /> : <Verified />}>
+              {signing ? "Guardando…" : "Guardar firma"}
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
     </Box>
   );
