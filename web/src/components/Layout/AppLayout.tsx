@@ -9,11 +9,12 @@ import {
 import {
   Dashboard, Business, Menu as MenuIcon, Build,
   ChevronLeft, Logout, Person, PrecisionManufacturing, Assignment,
-  CalendarMonth, AccountTree, Assessment, People,
+  CalendarMonth, AccountTree, Assessment, People, Settings,
 } from "@mui/icons-material";
 import { Divider as MuiDivider } from "@mui/material";
 import { supabase } from "../../supabaseClient";
 import { preloadGmao } from "../../lib/api";
+import NotificationBell from "../NotificationBell";
 
 const DRAWER_WIDTH = 240;
 
@@ -32,6 +33,7 @@ const NAV_GMAO = [
   { label: "Planes de Mant.",    path: "/maintenance-plans", icon: <CalendarMonth /> },
   { label: "Reportes",           path: "/reports",           icon: <Assessment /> },
   { label: "Usuarios",           path: "/users",             icon: <People /> },
+  { label: "Configuración",      path: "/settings",          icon: <Settings /> },
 ];
 
 interface AppLayoutProps {
@@ -197,7 +199,11 @@ export default function AppLayout({ session }: AppLayoutProps) {
           <IconButton edge="start" onClick={() => setDrawerOpen((v) => !v)} sx={{ mr: 2 }}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" sx={{ flex: 1 }}>Platform Admin</Typography>
+          <Typography variant="h6" sx={{ flex: 1 }}>
+            {isPlatformAdmin ? "Platform Admin" : "GMAO"}
+          </Typography>
+
+          <NotificationBell />
 
           <Tooltip title="Cuenta">
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>

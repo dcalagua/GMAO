@@ -5,7 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton, ToggleButtonGroup, ToggleButton,
 } from "@mui/material";
-import { Add, Refresh, Assignment, Edit, Delete } from "@mui/icons-material";
+import { Add, Refresh, Assignment, Edit, Delete, PlayArrow, CheckCircle, Lock } from "@mui/icons-material";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
 import { supabase } from "../supabaseClient";
 
@@ -92,6 +92,11 @@ export default function WorkOrdersPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // Flujo de cierre
+  const [transitioning, setTransitioning] = useState<string | null>(null);
+  const [completeWo, setCompleteWo] = useState<WorkOrder | null>(null);
+  const [completeHours, setCompleteHours] = useState("");
+  const [completeNotes, setCompleteNotes] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -209,6 +214,36 @@ export default function WorkOrdersPage() {
     }
   }
 
+  // Transición rápida de estado (iniciar / cerrar / cancelar)
+  async function transition(id: string, to: string, extra?: { actual_hours?: number; notes?: string }) {
+    setTransitioning(id);
+    try {
+      await callFn("tenant-work-orders", { action: "transition", id, to, ...extra });
+      invalidateCache("work-orders:list");
+      await load();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setTransitioning(null);
+    }
+  }
+
+  function openComplete(wo: WorkOrder) {
+    setCompleteWo(wo);
+    setCompleteHours(wo.estimated_hours?.toString() ?? "");
+    setCompleteNotes("");
+  }
+
+  async function handleComplete(e: React.FormEvent) {
+    e.preventDefault();
+    if (!completeWo) return;
+    await transition(completeWo.id, "completed", {
+      actual_hours: completeHours ? Number(completeHours) : undefined,
+      notes: completeNotes || undefined,
+    });
+    setCompleteWo(null);
+  }
+
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
@@ -318,6 +353,34 @@ export default function WorkOrdersPage() {
                     </TableCell>
                     <TableCell>{fmt(wo.planned_start)}</TableCell>
                     <TableCell align="right">
+                      {/* Flujo: iniciar (planned/released) → completar (in_progress) → cerrar (completed) */}
+                      {transitioning === wo.id ? (
+                        <CircularProgress size={16} sx={{ mx: 1 }} />
+                      ) : (
+                        <>
+                          {(wo.status === "planned" || wo.status === "released" || wo.status === "draft") && (
+                            <Tooltip title="Iniciar">
+                              <IconButton size="small" color="warning" onClick={() => transition(wo.id, "in_progress")}>
+                                <PlayArrow fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {wo.status === "in_progress" && (
+                            <Tooltip title="Completar">
+                              <IconButton size="small" color="success" onClick={() => openComplete(wo)}>
+                                <CheckCircle fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {wo.status === "completed" && (
+                            <Tooltip title="Cerrar">
+                              <IconButton size="small" color="success" onClick={() => transition(wo.id, "closed")}>
+                                <Lock fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </>
+                      )}
                       <Tooltip title="Editar">
                         <IconButton size="small" onClick={() => openEdit(wo)}><Edit fontSize="small" /></IconButton>
                       </Tooltip>
@@ -422,6 +485,38 @@ export default function WorkOrdersPage() {
             <Button type="submit" variant="contained" disabled={saving}
               startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <Add />}>
               {saving ? "Guardando…" : editId ? "Guardar cambios" : "Crear OT"}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* ── Diálogo Completar OT ────────────────────────────────────────────── */}
+      <Dialog open={!!completeWo} onClose={() => setCompleteWo(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <CheckCircle color="success" fontSize="small" />
+          Completar orden de trabajo
+        </DialogTitle>
+        <Box component="form" onSubmit={handleComplete}>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              <strong>{completeWo?.wo_number}</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{completeWo?.title}</Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <TextField label="Horas reales trabajadas" type="number" value={completeHours}
+                onChange={(e) => setCompleteHours(e.target.value)} autoFocus
+                slotProps={{ htmlInput: { min: 0, step: 0.5 } }} fullWidth />
+              <TextField label="Notas de cierre" value={completeNotes}
+                onChange={(e) => setCompleteNotes(e.target.value)} multiline rows={3} fullWidth
+                placeholder="Trabajo realizado, repuestos usados, observaciones…" />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button onClick={() => setCompleteWo(null)} disabled={transitioning === completeWo?.id}>Cancelar</Button>
+            <Button type="submit" variant="contained" color="success"
+              disabled={transitioning === completeWo?.id}
+              startIcon={transitioning === completeWo?.id ? <CircularProgress size={16} color="inherit" /> : <CheckCircle />}>
+              Marcar completada
             </Button>
           </DialogActions>
         </Box>
