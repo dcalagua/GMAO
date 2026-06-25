@@ -6,6 +6,8 @@ import LoginPage from "./pages/LoginPage";
 import AppLayout from "./components/Layout/AppLayout";
 import TenantsPage from "./pages/TenantsPage";
 import DashboardPage from "./pages/DashboardPage";
+import EquipmentPage from "./pages/EquipmentPage";
+import WorkOrdersPage from "./pages/WorkOrdersPage";
 import { CircularProgress, Box } from "@mui/material";
 
 export default function App() {
@@ -47,7 +49,9 @@ export default function App() {
         <Route path="/" element={<Navigate to="/tenants" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/tenants" element={<TenantsPage />} />
-        <Route path="*" element={<Navigate to="/tenants" replace />} />
+        <Route path="/equipment" element={<EquipmentPage />} />
+        <Route path="/work-orders" element={<WorkOrdersPage />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
   );
