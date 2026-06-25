@@ -62,8 +62,29 @@ mismo proyecto que la web (`xikbhkfeaosasdltartg`).
 La seguridad multi-tenant la resuelve el backend: cada Edge Function resuelve
 el tenant del usuario por su JWT; la app no maneja `tenant_id`.
 
+## Notificaciones push (FCM)
+
+El código de push ya está integrado (`services/push_service.dart`). Para
+activarlo necesitas un proyecto Firebase:
+
+1. Crea el proyecto en https://console.firebase.google.com y registra una app
+   **Android** con package name `pe.ebim.gmao` (el mismo del `applicationId`).
+2. Descarga **`google-services.json`** y colócalo en `android/app/`.
+3. Habilita el plugin de Google Services en Android (la forma simple es correr
+   `dart pub global activate flutterfire_cli` y luego `flutterfire configure`,
+   que configura gradle y descarga las opciones automáticamente).
+4. En el **backend**, guarda el service account de Firebase como secret:
+   ```bash
+   supabase secrets set FCM_SERVICE_ACCOUNT="$(cat service-account.json)" --project-ref xikbhkfeaosasdltartg
+   ```
+   (en Windows PowerShell: `supabase secrets set "FCM_SERVICE_ACCOUNT=$(Get-Content service-account.json -Raw)" --project-ref xikbhkfeaosasdltartg`)
+
+Con eso, al asignar una OT a un técnico se le envía push automáticamente
+(además de la notificación in-app y el email). Si el secret o el
+`google-services.json` no están, todo sigue funcionando sin push (degradación
+elegante).
+
 ## Próximos pasos
 
-- Agregar consumo de materiales desde el móvil (hoy es lectura).
-- Escaneo de QR de equipos (abrir ficha / crear OT en campo).
-- Notificaciones push (FCM) para OTs asignadas.
+- Push enriquecido (deep-link al tocar la notificación abre la OT).
+- Soporte offline (cola de cambios sin conexión).

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
+import 'services/push_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/work_orders_screen.dart';
 
@@ -11,6 +12,7 @@ Future<void> main() async {
     url: Config.supabaseUrl,
     anonKey: Config.supabaseAnonKey,
   );
+  await PushService.init();
   runApp(const GmaoApp());
 }
 
@@ -49,8 +51,10 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
+    if (_session != null) PushService.registerForUser();
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (mounted) setState(() => _session = data.session);
+      if (data.session != null) PushService.registerForUser();
     });
   }
 
