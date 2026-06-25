@@ -8,7 +8,8 @@ import {
 } from "@mui/material";
 import {
   Dashboard, Business, Menu as MenuIcon, Build,
-  ChevronLeft, Logout, Person, PrecisionManufacturing, Assignment, CalendarMonth, AccountTree, Assessment,
+  ChevronLeft, Logout, Person, PrecisionManufacturing, Assignment,
+  CalendarMonth, AccountTree, Assessment, People,
 } from "@mui/icons-material";
 import { Divider as MuiDivider } from "@mui/material";
 import { supabase } from "../../supabaseClient";
@@ -18,7 +19,7 @@ const DRAWER_WIDTH = 240;
 
 const NAV_PLATFORM = [
   { label: "Dashboard", path: "/dashboard", icon: <Dashboard /> },
-  { label: "Tenants", path: "/tenants", icon: <Business /> },
+  { label: "Tenants",   path: "/tenants",   icon: <Business /> },
 ];
 
 const NAV_GMAO = [
@@ -27,6 +28,7 @@ const NAV_GMAO = [
   { label: "Órdenes de Trabajo", path: "/work-orders",       icon: <Assignment /> },
   { label: "Planes de Mant.",    path: "/maintenance-plans", icon: <CalendarMonth /> },
   { label: "Reportes",           path: "/reports",           icon: <Assessment /> },
+  { label: "Usuarios",           path: "/users",             icon: <People /> },
 ];
 
 interface AppLayoutProps {
@@ -39,10 +41,17 @@ export default function AppLayout({ session }: AppLayoutProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  useEffect(() => { preloadGmao(); }, []);
-
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  useEffect(() => {
+    preloadGmao();
+    // Detectar si el usuario es administrador de la plataforma
+    supabase.schema("platform").from("admin_users")
+      .select("auth_user_id").eq("auth_user_id", session.user.id).maybeSingle()
+      .then(({ data }) => setIsPlatformAdmin(!!data));
+  }, [session.user.id]);
 
   const userEmail = session.user.email ?? "";
   const userInitial = userEmail.charAt(0).toUpperCase();
@@ -75,7 +84,7 @@ export default function AppLayout({ session }: AppLayoutProps) {
 
       {/* Navegación */}
       <List sx={{ flex: 1, pt: 1 }}>
-        {NAV_PLATFORM.map((item) => {
+        {isPlatformAdmin && NAV_PLATFORM.map((item) => {
           const active = location.pathname === item.path;
           return (
             <ListItemButton
@@ -97,7 +106,7 @@ export default function AppLayout({ session }: AppLayoutProps) {
           );
         })}
 
-        <MuiDivider sx={{ mx: 2, my: 1 }} />
+        {isPlatformAdmin && <MuiDivider sx={{ mx: 2, my: 1 }} />}
         <Typography variant="caption" color="text.disabled"
           sx={{ px: 3, pb: 0.5, display: "block", textTransform: "uppercase", letterSpacing: 1 }}>
           GMAO

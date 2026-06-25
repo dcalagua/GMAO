@@ -8,6 +8,7 @@ import TenantsPage from "./pages/TenantsPage";
 import DashboardPage from "./pages/DashboardPage";
 import LocationsPage from "./pages/LocationsPage";
 import ReportsPage from "./pages/ReportsPage";
+import UsersPage from "./pages/UsersPage";
 import EquipmentPage from "./pages/EquipmentPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
 import MaintenancePlansPage from "./pages/MaintenancePlansPage";
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/work-orders" element={<WorkOrdersPage />} />
         <Route path="/maintenance-plans" element={<MaintenancePlansPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/users" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
