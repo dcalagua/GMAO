@@ -168,6 +168,98 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
     }
   }
 
+  // ── Materiales ──────────────────────────────────────────────────────────────
+  Future<void> _addMaterialDialog() async {
+    List<Map<String, dynamic>> inventory = [];
+    try {
+      final res = await Api.call('tenant-inventory', {'action': 'list'});
+      inventory = (res['data'] as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
+      return;
+    }
+    if (!mounted) return;
+
+    String? matId;
+    final qty = TextEditingController();
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: const Text('Agregar material'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                value: matId,
+                decoration: const InputDecoration(
+                    labelText: 'Repuesto', border: OutlineInputBorder()),
+                items: inventory.map((m) {
+                  final stock = m['stock_qty'];
+                  return DropdownMenuItem<String>(
+                    value: m['id'] as String,
+                    enabled: (stock is num ? stock : 0) > 0,
+                    child: Text('${m['code']} — ${m['name']} ($stock ${m['unit']})',
+                        overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: (v) => setSt(() => matId = v),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: qty,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'Cantidad', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Agregar')),
+          ],
+        ),
+      ),
+    );
+
+    if (added == true && matId != null && qty.text.isNotEmpty) {
+      setState(() => _busy = true);
+      try {
+        await Api.call('tenant-work-orders', {
+          'action': 'add_material',
+          'id': widget.workOrderId,
+          'material_id': matId,
+          'qty': double.tryParse(qty.text) ?? 0,
+        });
+        await _loadAll();
+      } catch (e) {
+        final msg = e.toString().replaceFirst('Exception: ', '');
+        _snack(msg == 'INSUFFICIENT_STOCK' ? 'Stock insuficiente' : msg);
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _removeMaterial(String woMaterialId) async {
+    setState(() => _busy = true);
+    try {
+      await Api.call('tenant-work-orders',
+          {'action': 'remove_material', 'wo_material_id': woMaterialId});
+      await _loadAll();
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -222,7 +314,17 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
             _infoRow('Notas', wo.notes!),
 
           const SizedBox(height: 24),
-          _sectionTitle('Materiales', Icons.inventory_2_outlined),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _sectionTitle('Materiales', Icons.inventory_2_outlined),
+              IconButton(
+                onPressed: _busy ? null : _addMaterialDialog,
+                icon: const Icon(Icons.add_circle_outline),
+                tooltip: 'Agregar material',
+              ),
+            ],
+          ),
           if (_materials.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -235,8 +337,19 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(m['name']?.toString() ?? ''),
                   subtitle: Text('${m['qty']} ${m['unit'] ?? ''}'),
-                  trailing: Text(
-                      'S/ ${(_toNum(m['line_cost'])).toStringAsFixed(2)}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('S/ ${(_toNum(m['line_cost'])).toStringAsFixed(2)}'),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        color: Colors.red,
+                        onPressed: _busy
+                            ? null
+                            : () => _removeMaterial(m['id'] as String),
+                      ),
+                    ],
+                  ),
                 )),
 
           const SizedBox(height: 16),

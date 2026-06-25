@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/api.dart';
 import '../models/work_order.dart';
 import 'work_order_detail_screen.dart';
+import 'scan_screen.dart';
 
 class WorkOrdersScreen extends StatefulWidget {
   const WorkOrdersScreen({super.key});
@@ -83,6 +84,17 @@ class _WorkOrdersScreenState extends State<WorkOrdersScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: _buildBody(),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ScanScreen()),
+          );
+          _load();
+        },
+        icon: const Icon(Icons.qr_code_scanner),
+        label: const Text('Escanear'),
       ),
     );
   }
