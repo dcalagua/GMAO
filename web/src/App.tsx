@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage";
 import AppLayout from "./components/Layout/AppLayout";
 import TenantsPage from "./pages/TenantsPage";
 import DashboardPage from "./pages/DashboardPage";
+import LocationsPage from "./pages/LocationsPage";
 import EquipmentPage from "./pages/EquipmentPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
 import MaintenancePlansPage from "./pages/MaintenancePlansPage";
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/tenants" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/tenants" element={<TenantsPage />} />
+        <Route path="/locations" element={<LocationsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />
         <Route path="/work-orders" element={<WorkOrdersPage />} />
         <Route path="/maintenance-plans" element={<MaintenancePlansPage />} />

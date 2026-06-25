@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import {
   Dashboard, Business, Menu as MenuIcon, Build,
-  ChevronLeft, Logout, Person, PrecisionManufacturing, Assignment, CalendarMonth,
+  ChevronLeft, Logout, Person, PrecisionManufacturing, Assignment, CalendarMonth, AccountTree,
 } from "@mui/icons-material";
 import { Divider as MuiDivider } from "@mui/material";
 import { supabase } from "../../supabaseClient";
@@ -22,9 +22,10 @@ const NAV_PLATFORM = [
 ];
 
 const NAV_GMAO = [
-  { label: "Equipos", path: "/equipment", icon: <PrecisionManufacturing /> },
-  { label: "Órdenes de Trabajo", path: "/work-orders", icon: <Assignment /> },
-  { label: "Planes de Mant.", path: "/maintenance-plans", icon: <CalendarMonth /> },
+  { label: "Ubicaciones",        path: "/locations",         icon: <AccountTree /> },
+  { label: "Equipos",            path: "/equipment",         icon: <PrecisionManufacturing /> },
+  { label: "Órdenes de Trabajo", path: "/work-orders",       icon: <Assignment /> },
+  { label: "Planes de Mant.",    path: "/maintenance-plans", icon: <CalendarMonth /> },
 ];
 
 interface AppLayoutProps {
@@ -37,7 +38,6 @@ export default function AppLayout({ session }: AppLayoutProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  // Precarga los 3 endpoints GMAO en background para eliminar cold-starts visibles
   useEffect(() => { preloadGmao(); }, []);
 
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);

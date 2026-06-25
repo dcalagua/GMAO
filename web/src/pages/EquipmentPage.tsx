@@ -30,13 +30,15 @@ interface EqForm {
   code: string; name: string; description: string;
   equipment_type: string; manufacturer: string; model: string;
   serial_number: string; install_date: string;
-  status: string; criticality: string;
+  status: string; criticality: string; functional_location_id: string;
 }
+
+interface Location { id: string; code: string; name: string; level: number; }
 
 const EMPTY: EqForm = {
   code: "", name: "", description: "", equipment_type: "",
   manufacturer: "", model: "", serial_number: "",
-  install_date: "", status: "active", criticality: "medium",
+  install_date: "", status: "active", criticality: "medium", functional_location_id: "",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ function fmt(iso: string | null) {
 
 export default function EquipmentPage() {
   const [rows, setRows] = useState<Equipment[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -76,8 +79,12 @@ export default function EquipmentPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await callFnCached<{ data: Equipment[] }>("tenant-equipment", { action: "list" }, "equipment:list");
-      setRows(res.data ?? []);
+      const [eqRes, locRes] = await Promise.all([
+        callFnCached<{ data: Equipment[] }>("tenant-equipment", { action: "list" }, "equipment:list"),
+        callFnCached<{ data: Location[] }>("tenant-locations", { action: "list" }, "locations:list"),
+      ]);
+      setRows(eqRes.data ?? []);
+      setLocations(locRes.data ?? []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -102,6 +109,7 @@ export default function EquipmentPage() {
       model: eq.model ?? "", serial_number: eq.serial_number ?? "",
       install_date: eq.install_date?.slice(0, 10) ?? "",
       status: eq.status, criticality: eq.criticality,
+      functional_location_id: (eq as unknown as Record<string, string>).functional_location_id ?? "",
     });
     setSaveError(null);
     setDialogOpen(true);
@@ -125,12 +133,13 @@ export default function EquipmentPage() {
     try {
       const data = {
         ...form,
-        description:      form.description || undefined,
-        equipment_type:   form.equipment_type || undefined,
-        manufacturer:     form.manufacturer || undefined,
-        model:            form.model || undefined,
-        serial_number:    form.serial_number || undefined,
-        install_date: form.install_date || undefined,
+        description:           form.description || undefined,
+        equipment_type:        form.equipment_type || undefined,
+        manufacturer:          form.manufacturer || undefined,
+        model:                 form.model || undefined,
+        serial_number:         form.serial_number || undefined,
+        install_date:          form.install_date || undefined,
+        functional_location_id: form.functional_location_id || undefined,
       };
       if (editId) {
         await callFn("tenant-equipment", { action: "update", id: editId, data });
@@ -287,6 +296,15 @@ export default function EquipmentPage() {
               <TextField label="Descripción" value={form.description}
                 onChange={(e) => set("description", e.target.value)}
                 multiline rows={2} fullWidth />
+              <TextField label="Ubicación funcional" select value={form.functional_location_id}
+                onChange={(e) => set("functional_location_id", e.target.value)} fullWidth>
+                <MenuItem value="">— Sin ubicación —</MenuItem>
+                {locations.map((loc) => (
+                  <MenuItem key={loc.id} value={loc.id}>
+                    {"  ".repeat(loc.level - 1)}{loc.code} — {loc.name}
+                  </MenuItem>
+                ))}
+              </TextField>
               <Box sx={{ display: "flex", gap: 2 }}>
                 <TextField label="Tipo de equipo" select value={form.equipment_type}
                   onChange={(e) => set("equipment_type", e.target.value)} fullWidth>

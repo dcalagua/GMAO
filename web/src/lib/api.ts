@@ -60,6 +60,7 @@ export async function callFnCached<T = unknown>(
 // Precarga silenciosa — llamar al montar AppLayout
 export function preloadGmao() {
   const fns = [
+    { name: "tenant-locations",         body: { action: "list" }, key: "locations:list" },
     { name: "tenant-equipment",         body: { action: "list" }, key: "equipment:list" },
     { name: "tenant-work-orders",       body: { action: "list" }, key: "work-orders:list" },
     { name: "tenant-maintenance-plans", body: { action: "list" }, key: "plans:list" },
