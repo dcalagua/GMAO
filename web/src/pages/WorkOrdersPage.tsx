@@ -5,7 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Alert, Tooltip, CircularProgress, Skeleton, ToggleButtonGroup, ToggleButton,
 } from "@mui/material";
-import { Add, Refresh, Assignment, Edit, Delete, PlayArrow, CheckCircle, Lock } from "@mui/icons-material";
+import { Add, Refresh, Assignment, Edit, Delete, PlayArrow, CheckCircle, Lock, Inventory2 } from "@mui/icons-material";
 import { callFn, callFnCached, invalidateCache } from "../lib/api";
 import { supabase } from "../supabaseClient";
 
@@ -29,11 +29,14 @@ interface WorkOrder {
   notes: string | null;
   assigned_to_user_id: string | null;
   assigned_to_name: string | null;
+  materials_cost: number | null;
   created_at: string;
 }
 
 interface Equipment { id: string; code: string; name: string; }
 interface TenantUser { auth_user_id: string; email: string; full_name: string | null; }
+interface MaterialOpt { id: string; code: string; name: string; unit: string; stock_qty: number; unit_cost: number | null; }
+interface WoMaterial { id: string; material_id: string; code: string; name: string; unit: string; qty: number; unit_cost: number; line_cost: number; }
 
 interface WoForm {
   title: string; description: string;
@@ -97,6 +100,15 @@ export default function WorkOrdersPage() {
   const [completeWo, setCompleteWo] = useState<WorkOrder | null>(null);
   const [completeHours, setCompleteHours] = useState("");
   const [completeNotes, setCompleteNotes] = useState("");
+  // Materiales de la OT
+  const [matWo, setMatWo] = useState<WorkOrder | null>(null);
+  const [woMaterials, setWoMaterials] = useState<WoMaterial[]>([]);
+  const [inventory, setInventory] = useState<MaterialOpt[]>([]);
+  const [matLoading, setMatLoading] = useState(false);
+  const [addMatId, setAddMatId] = useState("");
+  const [addMatQty, setAddMatQty] = useState("");
+  const [matBusy, setMatBusy] = useState(false);
+  const [matError, setMatError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -244,6 +256,51 @@ export default function WorkOrdersPage() {
     setCompleteWo(null);
   }
 
+  // ── Materiales de la OT ────────────────────────────────────────────────────
+  async function openMaterials(wo: WorkOrder) {
+    setMatWo(wo); setMatError(null); setAddMatId(""); setAddMatQty(""); setMatLoading(true);
+    try {
+      const [matRes, invRes] = await Promise.all([
+        callFn<{ data: WoMaterial[] }>("tenant-work-orders", { action: "list_materials", id: wo.id }),
+        callFnCached<{ data: MaterialOpt[] }>("tenant-inventory", { action: "list" }, "inventory:list"),
+      ]);
+      setWoMaterials(matRes.data ?? []);
+      setInventory(invRes.data ?? []);
+    } catch (e) { setMatError((e as Error).message); }
+    finally { setMatLoading(false); }
+  }
+
+  async function refreshWoMaterials(woId: string) {
+    const res = await callFn<{ data: WoMaterial[] }>("tenant-work-orders", { action: "list_materials", id: woId });
+    setWoMaterials(res.data ?? []);
+    invalidateCache("inventory:list");
+    invalidateCache("work-orders:list");
+  }
+
+  async function handleAddMaterial(e: React.FormEvent) {
+    e.preventDefault();
+    if (!matWo || !addMatId || !addMatQty) return;
+    setMatBusy(true); setMatError(null);
+    try {
+      await callFn("tenant-work-orders", { action: "add_material", id: matWo.id, material_id: addMatId, qty: Number(addMatQty) });
+      setAddMatId(""); setAddMatQty("");
+      await refreshWoMaterials(matWo.id);
+    } catch (e) {
+      const msg = (e as Error).message;
+      setMatError(msg === "INSUFFICIENT_STOCK" ? "Stock insuficiente para esa cantidad." : msg);
+    } finally { setMatBusy(false); }
+  }
+
+  async function handleRemoveMaterial(woMaterialId: string) {
+    if (!matWo) return;
+    setMatBusy(true);
+    try {
+      await callFn("tenant-work-orders", { action: "remove_material", wo_material_id: woMaterialId });
+      await refreshWoMaterials(matWo.id);
+    } catch (e) { setMatError((e as Error).message); }
+    finally { setMatBusy(false); }
+  }
+
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
@@ -381,6 +438,9 @@ export default function WorkOrdersPage() {
                           )}
                         </>
                       )}
+                      <Tooltip title="Materiales / repuestos">
+                        <IconButton size="small" onClick={() => openMaterials(wo)}><Inventory2 fontSize="small" /></IconButton>
+                      </Tooltip>
                       <Tooltip title="Editar">
                         <IconButton size="small" onClick={() => openEdit(wo)}><Edit fontSize="small" /></IconButton>
                       </Tooltip>
@@ -520,6 +580,81 @@ export default function WorkOrdersPage() {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      {/* ── Diálogo Materiales de la OT ─────────────────────────────────────── */}
+      <Dialog open={!!matWo} onClose={() => setMatWo(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Inventory2 color="primary" fontSize="small" />
+          Materiales — {matWo?.wo_number}
+        </DialogTitle>
+        <DialogContent>
+          {matError && <Alert severity="error" sx={{ mb: 2 }}>{matError}</Alert>}
+
+          {/* Form agregar consumo */}
+          <Box component="form" onSubmit={handleAddMaterial} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", mb: 2 }}>
+            <TextField label="Repuesto" select value={addMatId} onChange={(e) => setAddMatId(e.target.value)}
+              required size="small" sx={{ flex: 1 }}>
+              {inventory.map((m) => (
+                <MenuItem key={m.id} value={m.id} disabled={m.stock_qty <= 0}>
+                  {m.code} — {m.name} ({m.stock_qty} {m.unit})
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField label="Cant." type="number" value={addMatQty} onChange={(e) => setAddMatQty(e.target.value)}
+              required size="small" sx={{ width: 90 }} slotProps={{ htmlInput: { min: 0, step: "any" } }} />
+            <Button type="submit" variant="contained" disabled={matBusy} sx={{ mt: 0.25 }}
+              startIcon={matBusy ? <CircularProgress size={14} color="inherit" /> : <Add />}>
+              Agregar
+            </Button>
+          </Box>
+
+          {matLoading ? <Skeleton variant="rectangular" height={120} /> : (
+            woMaterials.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
+                Sin materiales consumidos. Agrega el primero arriba.
+              </Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Repuesto</TableCell>
+                    <TableCell align="right">Cant.</TableCell>
+                    <TableCell align="right">Costo</TableCell>
+                    <TableCell align="right" />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {woMaterials.map((wm) => (
+                    <TableRow key={wm.id}>
+                      <TableCell>
+                        <Typography variant="body2">{wm.name}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{wm.code}</Typography>
+                      </TableCell>
+                      <TableCell align="right">{wm.qty} {wm.unit}</TableCell>
+                      <TableCell align="right">S/ {Number(wm.line_cost).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell align="right">
+                        <IconButton size="small" color="error" disabled={matBusy} onClick={() => handleRemoveMaterial(wm.id)}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell colSpan={2} sx={{ fontWeight: 700 }}>Total materiales</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      S/ {woMaterials.reduce((s, w) => s + Number(w.line_cost), 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableBody>
+              </Table>
+            )
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setMatWo(null); load(); }}>Cerrar</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

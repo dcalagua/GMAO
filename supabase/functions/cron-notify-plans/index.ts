@@ -23,7 +23,8 @@ Deno.serve(async (req: Request) => {
       SELECT t.id AS tenant_id, t.schema_name,
              COALESCE(s.notify_overdue, true)   AS notify_overdue,
              COALESCE(s.notify_email, true)     AS notify_email,
-             COALESCE(s.overdue_alert_days, 7)  AS alert_days
+             COALESCE(s.overdue_alert_days, 7)  AS alert_days,
+             COALESCE(s.low_stock_alerts, true) AS low_stock_alerts
       FROM platform.tenants t
       LEFT JOIN platform.tenant_settings s ON s.tenant_id = t.id
       WHERE t.status = 'active'
@@ -111,7 +112,67 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json({ ok: true, tenants_notified: processed });
+    // ── Alertas de stock bajo ──────────────────────────────────────────────
+    let lowStockNotified = 0;
+    for (const t of tenants) {
+      if (!t.low_stock_alerts) continue;
+      if (!/^tenant_[a-z0-9_]{1,50}$/.test(t.schema_name)) continue;
+
+      const [{ exists: alreadyToday }] = await sql`
+        SELECT EXISTS(
+          SELECT 1 FROM platform.notifications
+          WHERE tenant_id = ${t.tenant_id} AND type = 'low_stock'
+            AND created_at::date = now()::date
+        ) AS exists
+      `;
+      if (alreadyToday) continue;
+
+      const mats = await sql.begin(async (tx) => {
+        await tx.unsafe(`SET LOCAL search_path TO "${t.schema_name}", platform, public`);
+        return await tx`
+          SELECT code, name, stock_qty, min_stock, unit, (stock_qty <= 0) AS out_of_stock
+          FROM materials
+          WHERE stock_qty <= min_stock
+          ORDER BY (stock_qty <= 0) DESC, name ASC
+        ` as unknown as Array<{ code: string; name: string; stock_qty: number; min_stock: number; unit: string; out_of_stock: boolean }>;
+      }) as unknown as Array<{ code: string; name: string; stock_qty: number; min_stock: number; unit: string; out_of_stock: boolean }>;
+
+      if (mats.length === 0) continue;
+
+      const outCount = mats.filter((m) => m.out_of_stock).length;
+      const title = `${mats.length} repuesto(s) con stock bajo`;
+      const body = outCount > 0 ? `${outCount} agotado(s) · ${mats.length - outCount} bajo mínimo` : `${mats.length} bajo el mínimo`;
+
+      await sql`
+        INSERT INTO platform.notifications (tenant_id, auth_user_id, type, title, body, link)
+        VALUES (${t.tenant_id}, NULL, 'low_stock', ${title}, ${body}, '/inventory')
+      `;
+      lowStockNotified++;
+
+      if (t.notify_email && canEmail) {
+        const recipients = await sql`
+          SELECT u.email FROM platform.tenant_users tu
+          JOIN auth.users u ON u.id = tu.auth_user_id
+          WHERE tu.tenant_id = ${t.tenant_id} AND tu.is_active = true AND tu.role IN ('owner','admin')
+        ` as unknown as Array<{ email: string }>;
+        const rows = mats.slice(0, 20).map((m) => {
+          const tag = m.out_of_stock ? "<span style='color:#d32f2f;font-weight:bold'>AGOTADO</span>" : `${m.stock_qty} ${m.unit}`;
+          return `<tr><td style='padding:4px 8px'>${m.code}</td><td style='padding:4px 8px'>${m.name}</td><td style='padding:4px 8px'>${tag}</td><td style='padding:4px 8px'>${m.min_stock} ${m.unit}</td></tr>`;
+        }).join("");
+        const html = `<div style="font-family:Arial,sans-serif">
+          <h2 style="color:#e65100">Repuestos con stock bajo</h2>
+          <p>${body}</p>
+          <table style="border-collapse:collapse;font-size:14px">
+            <tr style='background:#f5f5f5'><th style='padding:4px 8px;text-align:left'>Código</th><th style='padding:4px 8px;text-align:left'>Repuesto</th><th style='padding:4px 8px;text-align:left'>Stock</th><th style='padding:4px 8px;text-align:left'>Mínimo</th></tr>
+            ${rows}
+          </table>
+          <p style="color:#666;margin-top:16px">Ingresa al GMAO para reponer el inventario.</p>
+        </div>`;
+        for (const r of recipients) await sendEmail(r.email, `GMAO: ${title}`, html);
+      }
+    }
+
+    return json({ ok: true, tenants_notified: processed, low_stock_notified: lowStockNotified });
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
