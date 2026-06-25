@@ -64,15 +64,25 @@ el tenant del usuario por su JWT; la app no maneja `tenant_id`.
 
 ## Notificaciones push (FCM)
 
-El código de push ya está integrado (`services/push_service.dart`). Para
-activarlo necesitas un proyecto Firebase:
+El código de push ya está integrado (`services/push_service.dart`) y el
+proyecto Firebase **GMAO EBIM** (`project_id: gmao-ebim`) ya está creado. El
+`google-services.json` está en `mobile/google-services.json`.
 
-1. Crea el proyecto en https://console.firebase.google.com y registra una app
-   **Android** con package name `pe.ebim.gmao` (el mismo del `applicationId`).
-2. Descarga **`google-services.json`** y colócalo en `android/app/`.
-3. Habilita el plugin de Google Services en Android (la forma simple es correr
+Tras `flutter create .`:
+
+1. **Fija el applicationId** a `pe.ebim.gmao` (debe coincidir con Firebase).
+   En `android/app/build.gradle` (o `build.gradle.kts`):
+   ```
+   namespace = "pe.ebim.gmao"
+   applicationId = "pe.ebim.gmao"
+   ```
+2. **Copia** el config a su lugar:
+   ```bash
+   cp google-services.json android/app/google-services.json
+   ```
+3. Habilita el plugin de Google Services (lo más simple:
    `dart pub global activate flutterfire_cli` y luego `flutterfire configure`,
-   que configura gradle y descarga las opciones automáticamente).
+   que ajusta gradle automáticamente).
 4. En el **backend**, guarda el service account de Firebase como secret:
    ```bash
    supabase secrets set FCM_SERVICE_ACCOUNT="$(cat service-account.json)" --project-ref xikbhkfeaosasdltartg
