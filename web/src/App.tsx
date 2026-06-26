@@ -13,6 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import EquipmentPage from "./pages/EquipmentPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
+import AvisosPage from "./pages/AvisosPage";
 import MaintenancePlansPage from "./pages/MaintenancePlansPage";
 import InventoryPage from "./pages/InventoryPage";
 import { CircularProgress, Box } from "@mui/material";
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/tenants" element={<TenantsPage />} />
         <Route path="/locations" element={<LocationsPage />} />
         <Route path="/equipment" element={<EquipmentPage />} />
+        <Route path="/avisos" element={<AvisosPage />} />
         <Route path="/work-orders" element={<WorkOrdersPage />} />
         <Route path="/maintenance-plans" element={<MaintenancePlansPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
