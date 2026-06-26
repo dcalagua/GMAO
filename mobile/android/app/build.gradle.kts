@@ -28,9 +28,12 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Firmado con debug keys por ahora.
             signingConfig = signingConfigs.getByName("debug")
+            // Desactivar R8/minificación: rompía mobile_scanner (ML Kit) por reflexión.
+            // Para publicar en Play Store: activar minify + reglas proguard de ML Kit.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
