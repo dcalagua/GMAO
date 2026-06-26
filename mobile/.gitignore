@@ -1,18 +1,29 @@
-# Flutter / Dart
+# Flutter / Dart / Pub
 .dart_tool/
-.packages
-build/
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
+build/
 pubspec.lock
 
-# Plataforma generada por `flutter create .`
-/android/
-/ios/
-/linux/
-/macos/
-/windows/
-/web/
+# Machine-specific / generated
+**/android/.gradle/
+**/android/.kotlin/
+**/android/captures/
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+.flutter-versions
+
+# Firmas / secretos (NO versionar)
+**/android/key.properties
+*.keystore
+*.jks
+
+# iOS (cuando se genere)
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Pods/
+**/ios/.symlinks/
 
 # IDE
 .idea/
