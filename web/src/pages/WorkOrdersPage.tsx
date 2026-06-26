@@ -43,7 +43,7 @@ interface WorkOrder {
 interface Equipment { id: string; code: string; name: string; }
 interface TenantUser { auth_user_id: string; email: string; full_name: string | null; }
 interface MaterialOpt { id: string; code: string; name: string; unit: string; stock_qty: number; unit_cost: number | null; }
-interface WoMaterial { id: string; material_id: string; code: string; name: string; unit: string; qty: number; unit_cost: number; line_cost: number; }
+interface WoMaterial { id: string; material_id: string; code: string; name: string; unit: string; qty: number; unit_cost: number; line_cost: number; line_status: string; stock_qty: number; }
 interface Attachment { id: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string; url: string | null; }
 
 interface WoForm {
@@ -115,6 +115,8 @@ export default function WorkOrdersPage() {
   const [matLoading, setMatLoading] = useState(false);
   const [addMatId, setAddMatId] = useState("");
   const [addMatQty, setAddMatQty] = useState("");
+  const [addMatMode, setAddMatMode] = useState<"consumed" | "reserved">("consumed");
+  const [reservasEnabled, setReservasEnabled] = useState(false);
   const [matBusy, setMatBusy] = useState(false);
   const [matError, setMatError] = useState<string | null>(null);
   // Adjuntos de la OT
@@ -154,6 +156,9 @@ export default function WorkOrdersPage() {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) setCurrentUserId(data.session.user.id);
     });
+    callFn<{ data: { reservas_enabled?: boolean } }>("tenant-settings", { action: "get" })
+      .then((r) => setReservasEnabled(r.data?.reservas_enabled === true))
+      .catch(() => {});
   }, [load]);
 
   useEffect(() => { load(); }, [load]);
@@ -302,12 +307,27 @@ export default function WorkOrdersPage() {
     if (!matWo || !addMatId || !addMatQty) return;
     setMatBusy(true); setMatError(null);
     try {
-      await callFn("tenant-work-orders", { action: "add_material", id: matWo.id, material_id: addMatId, qty: Number(addMatQty) });
+      await callFn("tenant-work-orders", {
+        action: "add_material", id: matWo.id, material_id: addMatId,
+        qty: Number(addMatQty), line_status: reservasEnabled ? addMatMode : "consumed",
+      });
       setAddMatId(""); setAddMatQty("");
       await refreshWoMaterials(matWo.id);
     } catch (e) {
       const msg = (e as Error).message;
       setMatError(msg === "INSUFFICIENT_STOCK" ? "Stock insuficiente para esa cantidad." : msg);
+    } finally { setMatBusy(false); }
+  }
+
+  async function handleIssueMaterial(woMaterialId: string) {
+    if (!matWo) return;
+    setMatBusy(true); setMatError(null);
+    try {
+      await callFn("tenant-work-orders", { action: "issue_material", wo_material_id: woMaterialId });
+      await refreshWoMaterials(matWo.id);
+    } catch (e) {
+      const msg = (e as Error).message;
+      setMatError(msg === "INSUFFICIENT_STOCK" ? "Stock insuficiente para entregar." : msg);
     } finally { setMatBusy(false); }
   }
 
@@ -714,7 +734,16 @@ export default function WorkOrdersPage() {
         <DialogContent>
           {matError && <Alert severity="error" sx={{ mb: 2 }}>{matError}</Alert>}
 
-          {/* Form agregar consumo */}
+          {/* Modo: consumir (descuenta) o reservar (aparta) */}
+          {reservasEnabled && (
+            <ToggleButtonGroup exclusive size="small" value={addMatMode}
+              onChange={(_, v) => { if (v) setAddMatMode(v); }} sx={{ mb: 1.5 }}>
+              <ToggleButton value="consumed">Consumir</ToggleButton>
+              <ToggleButton value="reserved">Reservar</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+
+          {/* Form agregar consumo/reserva */}
           <Box component="form" onSubmit={handleAddMaterial} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", mb: 2 }}>
             <TextField label="Repuesto" select value={addMatId} onChange={(e) => setAddMatId(e.target.value)}
               required size="small" sx={{ flex: 1 }}>
@@ -743,6 +772,7 @@ export default function WorkOrdersPage() {
                   <TableRow>
                     <TableCell>Repuesto</TableCell>
                     <TableCell align="right">Cant.</TableCell>
+                    <TableCell>Estado</TableCell>
                     <TableCell align="right">Costo</TableCell>
                     <TableCell align="right" />
                   </TableRow>
@@ -755,8 +785,20 @@ export default function WorkOrdersPage() {
                         <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{wm.code}</Typography>
                       </TableCell>
                       <TableCell align="right">{wm.qty} {wm.unit}</TableCell>
+                      <TableCell>
+                        <Chip size="small" variant="outlined"
+                          label={wm.line_status === "reserved" ? "Reservado" : "Consumido"}
+                          color={wm.line_status === "reserved" ? "info" : "success"} />
+                      </TableCell>
                       <TableCell align="right">S/ {Number(wm.line_cost).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell align="right">
+                        {wm.line_status === "reserved" && (
+                          <Tooltip title="Entregar (consumir reserva)">
+                            <IconButton size="small" color="success" disabled={matBusy} onClick={() => handleIssueMaterial(wm.id)}>
+                              <CheckCircle fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         <IconButton size="small" color="error" disabled={matBusy} onClick={() => handleRemoveMaterial(wm.id)}>
                           <Delete fontSize="small" />
                         </IconButton>
@@ -764,7 +806,7 @@ export default function WorkOrdersPage() {
                     </TableRow>
                   ))}
                   <TableRow>
-                    <TableCell colSpan={2} sx={{ fontWeight: 700 }}>Total materiales</TableCell>
+                    <TableCell colSpan={3} sx={{ fontWeight: 700 }}>Total materiales</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
                       S/ {woMaterials.reduce((s, w) => s + Number(w.line_cost), 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
                     </TableCell>
