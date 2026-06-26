@@ -13,7 +13,7 @@ import {
 } from "@mui/icons-material";
 import { Divider as MuiDivider } from "@mui/material";
 import { supabase } from "../../supabaseClient";
-import { preloadGmao } from "../../lib/api";
+import { preloadGmao, callFn } from "../../lib/api";
 import NotificationBell from "../NotificationBell";
 
 const DRAWER_WIDTH = 240;
@@ -50,6 +50,7 @@ export default function AppLayout({ session }: AppLayoutProps) {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [avisosEnabled, setAvisosEnabled] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -59,7 +60,13 @@ export default function AppLayout({ session }: AppLayoutProps) {
     supabase.schema("platform").from("admin_users")
       .select("auth_user_id").eq("auth_user_id", session.user.id).maybeSingle()
       .then(({ data }) => setIsPlatformAdmin(!!data));
+    // Módulos configurables del tenant
+    callFn<{ data: { avisos_enabled?: boolean } }>("tenant-settings", { action: "get" })
+      .then((r) => setAvisosEnabled(r.data?.avisos_enabled !== false))
+      .catch(() => {});
   }, [session.user.id]);
+
+  const gmaoNav = NAV_GMAO.filter((i) => i.path !== "/avisos" || avisosEnabled);
 
   const userEmail = session.user.email ?? "";
   const userInitial = userEmail.charAt(0).toUpperCase();
@@ -149,7 +156,7 @@ export default function AppLayout({ session }: AppLayoutProps) {
           GMAO
         </Typography>
 
-        {NAV_GMAO.map((item) => {
+        {gmaoNav.map((item) => {
           const active = location.pathname === item.path;
           return (
             <ListItemButton

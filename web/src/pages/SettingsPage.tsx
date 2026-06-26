@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Switch, FormControlLabel,
   TextField, Button, Alert, Divider, CircularProgress, Skeleton, Chip,
 } from "@mui/material";
-import { Settings, AutoMode, NotificationsActive, Save, Email, Paid } from "@mui/icons-material";
+import { Settings, AutoMode, NotificationsActive, Save, Email, Paid, Extension } from "@mui/icons-material";
 import { callFn } from "../lib/api";
 
 interface SettingsData {
@@ -15,12 +15,15 @@ interface SettingsData {
   overdue_alert_days: number;
   low_stock_alerts: boolean;
   labor_rate_per_hour: number;
+  avisos_enabled: boolean;
+  reservas_enabled: boolean;
 }
 
 const DEFAULTS: SettingsData = {
   auto_generate_wo: true, autogen_lead_days: 0, notify_email: true,
   notify_assignment: true, notify_overdue: true, overdue_alert_days: 7,
   low_stock_alerts: true, labor_rate_per_hour: 0,
+  avisos_enabled: true, reservas_enabled: true,
 };
 
 export default function SettingsPage() {
@@ -164,6 +167,26 @@ export default function SettingsPage() {
             slotProps={{ htmlInput: { min: 0, step: "0.01" } }}
             helperText="Se usa para calcular el costo de mano de obra de las OTs en Reportes"
             sx={{ width: 320 }} />
+        </CardContent>
+      </Card>
+
+      {/* ── Módulos (SAP PM) ────────────────────────────────────────────────── */}
+      <Card sx={{ mb: 2.5 }}>
+        <CardContent>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <Extension color="primary" fontSize="small" />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Módulos</Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <FormControlLabel
+            control={<Switch checked={form.avisos_enabled} disabled={!canEdit}
+              onChange={(e) => set("avisos_enabled", e.target.checked)} />}
+            label="Avisos de mantenimiento (flujo SAP PM: aviso → orden)" />
+          <Box sx={{ height: 8 }} />
+          <FormControlLabel
+            control={<Switch checked={form.reservas_enabled} disabled={!canEdit}
+              onChange={(e) => set("reservas_enabled", e.target.checked)} />}
+            label="Reservas de materiales en OT (apartar stock sin consumir)" />
         </CardContent>
       </Card>
 
