@@ -141,7 +141,6 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
             sign['path'] as String,
             sign['token'] as String,
             bytes,
-            fileOptions: FileOptions(contentType: x.mimeType ?? 'image/jpeg'),
           );
       await Api.call('tenant-attachments', {
         'action': 'confirm',

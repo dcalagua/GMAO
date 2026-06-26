@@ -8,11 +8,16 @@ import 'screens/work_orders_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: Config.supabaseUrl,
-    anonKey: Config.supabaseAnonKey,
-  );
-  await PushService.init();
+  // Inicialización tolerante a fallos: la app siempre arranca.
+  try {
+    await Supabase.initialize(
+      url: Config.supabaseUrl,
+      anonKey: Config.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('Error inicializando Supabase: $e');
+  }
+  await PushService.init(); // ya maneja sus propios errores
   runApp(const GmaoApp());
 }
 
