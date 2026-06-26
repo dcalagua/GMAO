@@ -17,6 +17,7 @@ class WorkOrderDetailScreen extends StatefulWidget {
 
 class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
   WorkOrder? _wo;
+  Map<String, dynamic> _woJson = {};
   List<Map<String, dynamic>> _materials = [];
   List<Map<String, dynamic>> _attachments = [];
   bool _loading = true;
@@ -35,21 +36,33 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
       _error = null;
     });
     try {
-      final listRes = await Api.call('tenant-work-orders', {'action': 'list'});
-      final all = (listRes['data'] as List).cast<Map<String, dynamic>>();
+      // La OT se obtiene de la caché de la lista (funciona offline)
+      final all = (await Api.cachedList(
+              'tenant-work-orders', {'action': 'list'}, 'wo_list'))
+          .cast<Map<String, dynamic>>();
       final j = all.firstWhere((e) => e['id'] == widget.workOrderId,
           orElse: () => {});
       if (j.isEmpty) throw Exception('OT no encontrada');
 
-      final matRes = await Api.call('tenant-work-orders',
-          {'action': 'list_materials', 'id': widget.workOrderId});
-      final attRes = await Api.call('tenant-attachments',
-          {'action': 'list', 'work_order_id': widget.workOrderId});
+      // Materiales y adjuntos: best-effort (requieren conexión)
+      List<Map<String, dynamic>> mats = [];
+      List<Map<String, dynamic>> atts = [];
+      try {
+        final matRes = await Api.call('tenant-work-orders',
+            {'action': 'list_materials', 'id': widget.workOrderId});
+        mats = (matRes['data'] as List).cast<Map<String, dynamic>>();
+      } catch (_) {}
+      try {
+        final attRes = await Api.call('tenant-attachments',
+            {'action': 'list', 'work_order_id': widget.workOrderId});
+        atts = (attRes['data'] as List).cast<Map<String, dynamic>>();
+      } catch (_) {}
 
       setState(() {
+        _woJson = j;
         _wo = WorkOrder.fromJson(j);
-        _materials = (matRes['data'] as List).cast<Map<String, dynamic>>();
-        _attachments = (attRes['data'] as List).cast<Map<String, dynamic>>();
+        _materials = mats;
+        _attachments = atts;
       });
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
@@ -62,14 +75,22 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
       {double? actualHours, String? notes}) async {
     setState(() => _busy = true);
     try {
-      await Api.call('tenant-work-orders', {
+      final res = await Api.mutate('tenant-work-orders', {
         'action': 'transition',
         'id': widget.workOrderId,
         'to': to,
         if (actualHours != null) 'actual_hours': actualHours,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
       });
-      await _loadAll();
+      if (res['queued'] == true) {
+        _snack('Cambio guardado sin conexión. Se enviará al reconectar.');
+        // reflejar el nuevo estado localmente
+        if (mounted && _wo != null) {
+          setState(() => _wo = WorkOrder.fromJson({..._woJson, 'status': to}));
+        }
+      } else {
+        await _loadAll();
+      }
     } catch (e) {
       _snack(e.toString().replaceFirst('Exception: ', ''));
     } finally {

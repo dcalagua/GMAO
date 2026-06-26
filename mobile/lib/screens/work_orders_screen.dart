@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../services/api.dart';
+import '../services/offline_store.dart';
 import '../models/work_order.dart';
 import 'work_order_detail_screen.dart';
 import 'scan_screen.dart';
@@ -19,22 +22,49 @@ class _WorkOrdersScreenState extends State<WorkOrdersScreen> {
   bool _loading = true;
   String? _error;
   bool _onlyMine = true;
+  bool _offline = false;
+  int _pending = 0;
+  StreamSubscription? _connSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Al recuperar conexión, sincroniza la cola y recarga
+    _connSub = Connectivity().onConnectivityChanged.listen((r) async {
+      final online = !r.contains(ConnectivityResult.none);
+      if (online) {
+        final sent = await Api.flushQueue();
+        if (mounted && sent > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$sent cambio(s) sincronizado(s)')));
+        }
+        _load();
+      } else if (mounted) {
+        setState(() => _offline = true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
+    await Api.flushQueue();
     try {
-      final res = await Api.call('tenant-work-orders', {'action': 'list'});
-      final data = (res['data'] as List).cast<Map<String, dynamic>>();
-      setState(() => _all = data.map(WorkOrder.fromJson).toList());
+      final online = await Api.isOnline();
+      final data = (await Api.cachedList('tenant-work-orders', {'action': 'list'}, 'wo_list'))
+          .cast<Map<String, dynamic>>();
+      final pend = await OfflineStore.pendingCount();
+      setState(() {
+        _all = data.map(WorkOrder.fromJson).toList();
+        _offline = !online;
+        _pending = pend;
+      });
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -90,9 +120,33 @@ class _WorkOrdersScreenState extends State<WorkOrdersScreen> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _buildBody(),
+      body: Column(
+        children: [
+          if (_offline || _pending > 0)
+            Container(
+              width: double.infinity,
+              color: _offline ? Colors.orange.shade100 : Colors.blue.shade50,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(_offline ? Icons.cloud_off : Icons.sync,
+                      size: 18, color: _offline ? Colors.orange.shade900 : Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _offline
+                          ? 'Sin conexión — mostrando datos guardados${_pending > 0 ? " · $_pending pendiente(s)" : ""}'
+                          : '$_pending cambio(s) pendiente(s) de sincronizar',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: RefreshIndicator(onRefresh: _load, child: _buildBody()),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {

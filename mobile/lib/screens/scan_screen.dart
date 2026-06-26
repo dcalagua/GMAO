@@ -189,7 +189,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
     setState(() => _busy = true);
     try {
-      final res = await Api.call('tenant-avisos', {
+      final res = await Api.mutate('tenant-avisos', {
         'action': 'create',
         'data': {
           'notif_type': 'M2', // avería
@@ -201,10 +201,13 @@ class _ScanScreenState extends State<ScanScreen> {
           'reported_by_name': Api.currentEmail,
         },
       });
-      final av = res['data'] as Map<String, dynamic>;
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Aviso ${av['code']} creado. El supervisor lo revisará.')));
+      final queued = res['queued'] == true;
+      final av = res['data'] as Map<String, dynamic>?;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        queued
+            ? 'Aviso guardado sin conexión. Se enviará al reconectar.'
+            : 'Aviso ${av?['code'] ?? ''} creado. El supervisor lo revisará.')));
       Navigator.pop(context); // volver a la lista
     } catch (e) {
       if (mounted) {

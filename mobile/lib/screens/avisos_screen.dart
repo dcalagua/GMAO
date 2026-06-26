@@ -30,9 +30,10 @@ class _AvisosScreenState extends State<AvisosScreen> {
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
+    await Api.flushQueue();
     try {
-      final res = await Api.call('tenant-avisos', {'action': 'list'});
-      setState(() => _rows = (res['data'] as List).cast<Map<String, dynamic>>());
+      final data = await Api.cachedList('tenant-avisos', {'action': 'list'}, 'avisos_list');
+      setState(() => _rows = data.cast<Map<String, dynamic>>());
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -116,7 +117,7 @@ class _AvisosScreenState extends State<AvisosScreen> {
         if (equipoId != null) {
           eq = equipos.firstWhere((e) => e['id'] == equipoId, orElse: () => {});
         }
-        await Api.call('tenant-avisos', {
+        final res = await Api.mutate('tenant-avisos', {
           'action': 'create',
           'data': {
             'notif_type': type,
@@ -129,6 +130,10 @@ class _AvisosScreenState extends State<AvisosScreen> {
             'reported_by_name': Api.currentEmail,
           },
         });
+        if (mounted && res['queued'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Aviso guardado sin conexión. Se enviará al reconectar.')));
+        }
         await _load();
       } catch (e) {
         if (mounted) {
