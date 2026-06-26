@@ -20,6 +20,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
   Map<String, dynamic> _woJson = {};
   List<Map<String, dynamic>> _materials = [];
   List<Map<String, dynamic>> _attachments = [];
+  List<Map<String, dynamic>> _inventory = []; // precargado para el diálogo de materiales
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -57,12 +58,19 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
             {'action': 'list', 'work_order_id': widget.workOrderId});
         atts = (attRes['data'] as List).cast<Map<String, dynamic>>();
       } catch (_) {}
+      // Precargar inventario (cacheado) para que el diálogo de materiales abra al instante
+      List<Map<String, dynamic>> inv = _inventory;
+      try {
+        inv = (await Api.cachedList('tenant-inventory', {'action': 'list'}, 'inventory_list'))
+            .cast<Map<String, dynamic>>();
+      } catch (_) {}
 
       setState(() {
         _woJson = j;
         _wo = WorkOrder.fromJson(j);
         _materials = mats;
         _attachments = atts;
+        _inventory = inv;
       });
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
@@ -190,13 +198,17 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
 
   // ── Materiales ──────────────────────────────────────────────────────────────
   Future<void> _addMaterialDialog() async {
-    List<Map<String, dynamic>> inventory = [];
-    try {
-      final res = await Api.call('tenant-inventory', {'action': 'list'});
-      inventory = (res['data'] as List).cast<Map<String, dynamic>>();
-    } catch (e) {
-      _snack(e.toString().replaceFirst('Exception: ', ''));
-      return;
+    // Usa el inventario precargado (instantáneo). Si está vacío, intenta cargarlo.
+    List<Map<String, dynamic>> inventory = _inventory;
+    if (inventory.isEmpty) {
+      try {
+        inventory = (await Api.cachedList('tenant-inventory', {'action': 'list'}, 'inventory_list'))
+            .cast<Map<String, dynamic>>();
+        if (mounted) setState(() => _inventory = inventory);
+      } catch (e) {
+        _snack(e.toString().replaceFirst('Exception: ', ''));
+        return;
+      }
     }
     if (!mounted) return;
 
