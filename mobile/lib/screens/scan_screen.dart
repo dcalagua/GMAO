@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../services/api.dart';
-import 'work_order_detail_screen.dart';
 
 /// Escanea el QR de un equipo (URL .../equipment?code=XXX), lo busca y permite
-/// reportar una falla creando una OT correctiva.
+/// reportar una falla creando un aviso de mantenimiento.
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -123,7 +122,7 @@ class _ScanScreenState extends State<ScanScreen> {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 icon: const Icon(Icons.report_problem),
-                label: const Text('Reportar falla (OT correctiva)'),
+                label: const Text('Reportar falla (Aviso)'),
                 onPressed: () {
                   Navigator.pop(context);
                   _reportFault(eq);
@@ -178,7 +177,7 @@ class _ScanScreenState extends State<ScanScreen> {
               child: const Text('Cancelar')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Crear OT')),
+              child: const Text('Crear aviso')),
         ],
       ),
     );
@@ -190,27 +189,23 @@ class _ScanScreenState extends State<ScanScreen> {
 
     setState(() => _busy = true);
     try {
-      final res = await Api.call('tenant-work-orders', {
+      final res = await Api.call('tenant-avisos', {
         'action': 'create',
         'data': {
+          'notif_type': 'M2', // avería
           'title': title.text,
           'description': desc.text,
-          'work_order_type': 'corrective',
           'priority': 'high',
-          'status': 'planned',
           'equipment_id': eq['id'],
-          'assigned_to_user_id': Api.currentUserId,
-          'assigned_to_name': Api.currentEmail,
+          'functional_location_id': eq['functional_location_id'],
+          'reported_by_name': Api.currentEmail,
         },
       });
-      final wo = res['data'] as Map<String, dynamic>;
+      final av = res['data'] as Map<String, dynamic>;
       if (!mounted) return;
-      // Abrir la OT recién creada
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-            builder: (_) => WorkOrderDetailScreen(workOrderId: wo['id'] as String)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Aviso ${av['code']} creado. El supervisor lo revisará.')));
+      Navigator.pop(context); // volver a la lista
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -5,6 +5,7 @@ import '../services/api.dart';
 import '../models/work_order.dart';
 import 'work_order_detail_screen.dart';
 import 'scan_screen.dart';
+import 'avisos_screen.dart';
 
 class WorkOrdersScreen extends StatefulWidget {
   const WorkOrdersScreen({super.key});
@@ -59,6 +60,14 @@ class _WorkOrdersScreenState extends State<WorkOrdersScreen> {
       appBar: AppBar(
         title: const Text('Órdenes de Trabajo'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.report_problem_outlined),
+            tooltip: 'Avisos',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AvisosScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',
