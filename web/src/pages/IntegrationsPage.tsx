@@ -9,6 +9,7 @@ import { callFn } from "../lib/api";
 
 interface IntegrationData {
   provider: string;
+  connection_type: string;
   name: string;
   enabled: boolean;
   base_url: string | null;
@@ -33,6 +34,12 @@ const PROVIDERS = [
   { value: "sap", label: "SAP" },
   { value: "oracle", label: "Oracle ERP" },
   { value: "dynamics365", label: "Microsoft Dynamics 365" },
+];
+const CONNECTION_TYPES = [
+  { value: "rest", label: "REST / JSON" },
+  { value: "odata", label: "OData (SAP Gateway)" },
+  { value: "soap", label: "SOAP / Web Service" },
+  { value: "rfc", label: "RFC / BAPI" },
 ];
 const AUTH_TYPES = [
   { value: "none", label: "Sin autenticación" },
@@ -165,8 +172,12 @@ export default function IntegrationsPage() {
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
             <Box sx={{ display: "flex", gap: 2 }}>
               <TextField label="Proveedor" select value={form.provider} disabled={!canEdit}
-                onChange={(e) => set("provider", e.target.value)} sx={{ width: 240 }}>
+                onChange={(e) => set("provider", e.target.value)} sx={{ width: 220 }}>
                 {PROVIDERS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
+              </TextField>
+              <TextField label="Tipo de conexión" select value={form.connection_type} disabled={!canEdit}
+                onChange={(e) => set("connection_type", e.target.value)} sx={{ width: 220 }}>
+                {CONNECTION_TYPES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
               </TextField>
               <TextField label="Nombre" value={form.name} disabled={!canEdit}
                 onChange={(e) => set("name", e.target.value)} fullWidth />
